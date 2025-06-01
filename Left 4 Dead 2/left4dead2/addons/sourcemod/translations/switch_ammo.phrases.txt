@@ -1,0 +1,11 @@
+"Phrases"
+{
+	"About_Switch_Ammo"
+	{
+		"en"		"{white}Press {orange}SHIFT {white}+ {orange}RELOAD {white}to switch between upgraded and normal ammo."
+	}
+	"About_Switch_Ammo_Hold"
+	{
+		"en"		"{white}Hold {orange}RELOAD {white}to switch between upgraded and normal ammo."
+	}
+}
