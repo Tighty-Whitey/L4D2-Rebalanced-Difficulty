@@ -1,0 +1,11 @@
+"Phrases"
+{
+	"About_Switch_Ammo"
+	{
+		"es"		"{white}Presiona {orange}SHIFT{white}+{orange}RECARGA {white}para cambiar entre munición mejorada y normal."
+	}
+	"About_Switch_Ammo_Hold"
+	{
+		"es"		"{white}Mantener {orange}RECARGA {white}para cambiar entre munición mejorada y normal."
+	}
+}
