@@ -1,0 +1,11 @@
+"Phrases"
+{
+	"About_Switch_Ammo"
+	{
+		"chi"		"{white}点按 {orange}Shift {white}+ {orange}重载键{white}在普通弹药、燃烧弹和高爆弹之间切换"
+	}
+	"About_Switch_Ammo_Hold"
+	{
+		"chi"		"{white}按住 {orange}重载键 {white}在普通弹药、燃烧弹和高爆弹之间切换"
+	}
+}
