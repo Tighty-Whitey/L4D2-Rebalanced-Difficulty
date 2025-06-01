@@ -1,0 +1,11 @@
+"Phrases"
+{
+	"About_Switch_Ammo"
+	{
+		"zho"		"{white}點按 {orange}Shift {white}+ {orange}重載鍵{white}在普通彈藥、燃燒彈和高爆彈之間切換"
+	}
+	"About_Switch_Ammo_Hold"
+	{
+		"zho"		"{white}按住 {orange}重載鍵 {white}在普通彈藥、燃燒彈和高爆彈之間切換"
+	}
+}
