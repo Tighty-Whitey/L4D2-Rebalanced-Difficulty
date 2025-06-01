@@ -1,0 +1,164 @@
+"Games"
+{
+	"#default"
+	{
+		"Functions"
+		{
+			"L4DD::CMolotovProjectile::Create"
+			{
+				"signature"		"FindAddress_0"
+				"callconv"		"cdecl"
+				"return"		"cbaseentity"
+				"arguments"
+				{
+					"origin"
+					{
+						"type"		"vectorptr"
+					}
+					"angles"
+					{
+						"type"		"vectorptr"
+					}
+					"velocity"
+					{
+						"type"		"vectorptr"
+					}
+					"rotation"
+					{
+						"type"		"vectorptr"
+					}
+					"owner"
+					{
+						"type"		"cbaseentity"
+					}
+					"duration"
+					{
+						"type"		"float"
+					}
+				}
+			}
+			"L4DD::CVomitJarProjectile::Create"
+			{
+				"signature"		"FindAddress_1"
+				"callconv"		"cdecl"
+				"return"		"cbaseentity"
+				"arguments"
+				{
+					"origin"
+					{
+						"type"		"vectorptr"
+					}
+					"angles"
+					{
+						"type"		"vectorptr"
+					}
+					"velocity"
+					{
+						"type"		"vectorptr"
+					}
+					"rotation"
+					{
+						"type"		"vectorptr"
+					}
+					"owner"
+					{
+						"type"		"cbaseentity"
+					}
+					"duration"
+					{
+						"type"		"float"
+					}
+				}
+			}
+			"L4DD::CGrenadeLauncher_Projectile::Create"
+			{
+				"signature"		"FindAddress_2"
+				"callconv"		"cdecl"
+				"return"		"cbaseentity"
+				"arguments"
+				{
+					"origin"
+					{
+						"type"		"vectorptr"
+					}
+					"angles"
+					{
+						"type"		"vectorptr"
+					}
+					"velocity"
+					{
+						"type"		"vectorptr"
+					}
+					"rotation"
+					{
+						"type"		"vectorptr"
+					}
+					"owner"
+					{
+						"type"		"cbaseentity"
+					}
+					"bIncendiary"
+					{
+						"type"		"int"
+					}
+				}
+			}
+		}
+
+		"Addresses"
+		{
+			"FindAddress_0"
+			{
+				"windows"
+				{
+					"signature"		"FindAddress_0"
+				}
+			}
+			"FindAddress_1"
+			{
+				"windows"
+				{
+					"signature"		"FindAddress_1"
+				}
+			}
+			"FindAddress_2"
+			{
+				"windows"
+				{
+					"signature"		"FindAddress_2"
+				}
+			}
+			"FindAddress_3"
+			{
+				"windows"
+				{
+					"signature"		"FindAddress_3"
+				}
+			}
+		}
+
+		"Signatures"
+		{
+			"FindAddress_0"
+			{
+				"library"	"server"
+				"windows"	"\x55\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x68\x80\x8B\x28\x69"
+			}
+			"FindAddress_1"
+			{
+				"library"	"server"
+				"windows"	"\x55\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x68\x30\x82\x29\x69"
+			}
+			"FindAddress_2"
+			{
+				"library"	"server"
+				"windows"	"\x55\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x68\x50\x29\x28\x69"
+			}
+			"FindAddress_3"
+			{
+				"library"	"server"
+				"windows"	"\x8B\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x68\x64\x3C\x24\x69\x68"
+			}
+		}
+	}
+}
