@@ -1,6 +1,6 @@
 /*
 *	Weather Control
-*	Copyright (C) 2024 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.18"
+#define PLUGIN_VERSION		"1.19"
 
 /*======================================================================================
 	Plugin Info:
@@ -32,8 +32,11 @@
 ========================================================================================
 	Change Log:
 
-1.18 (30-Oct-2024)
-	- Changes to fix the skybox not always loading correctly. Thanks to "Tighty-Whitey" for reporting.
+1.19 (11-Jun-2025)
+	- Pre-cache rain to prevent stutter. Thanks to "Tighty-Whitey" for reporting and testing.
+
+1.18 (05-Nov-2024)
+	- Changes to fix the skybox not always loading correctly. Thanks to "Tighty-Whitey" for reporting and testing.
 
 1.17 (12-Mar-2024)
 	- Added configuration for the "sun_overlaysize" and "sun_size", for idle and storm weather. Thanks to "glhf3000" for writing the code.
@@ -158,7 +161,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define DEBUG_LOGS			1 // Log some debug stuff to "sourcemod/logs/storm.log"
+#define DEBUG_LOGS			0 // Log some debug stuff to "sourcemod/logs/storm.log"
 #define DEBUG_PATH			"logs/storm.log"
 
 #define CVAR_FLAGS			FCVAR_NOTIFY
@@ -506,6 +509,55 @@ public void OnMapStart()
 	DownloadSkyboxes();
 	if( g_bCvarAllow )
 		SetSkyname();
+
+	// Precache rain:
+	int entity, type;
+	char buffer[128];
+
+	for( int i = 0; i < 3; i++ )
+	{
+		switch( i )
+		{
+			case 0: type = 0;
+			case 1: type = 4;
+			case 2: type = 6;
+		}
+
+		entity = CreateEntityByName("func_precipitation");
+		if( entity != -1 )
+		{
+			GetCurrentMap(buffer, sizeof(buffer));
+			Format(buffer, sizeof(buffer), "maps/%s.bsp", buffer);
+
+			DispatchKeyValue(entity, "model", buffer);
+			DispatchKeyValue(entity, "targetname", "silver_rain");
+			IntToString(type, buffer, sizeof(buffer));
+			DispatchKeyValue(entity, "preciptype", buffer);
+			DispatchKeyValue(entity, "minSpeed", "25");
+			DispatchKeyValue(entity, "maxSpeed", "35");
+			DispatchKeyValue(entity, "renderfx", "21");
+			DispatchKeyValue(entity, "rendercolor", "31 34 52");
+			DispatchKeyValue(entity, "renderamt", "100");
+			g_iRains[i] = EntIndexToEntRef(entity);
+
+			float vMins[3], vMaxs[3];
+			GetEntPropVector(0, Prop_Data, "m_WorldMins", vMins);
+			GetEntPropVector(0, Prop_Data, "m_WorldMaxs", vMaxs);
+			SetEntPropVector(entity, Prop_Send, "m_vecMins", vMins);
+			SetEntPropVector(entity, Prop_Send, "m_vecMaxs", vMaxs);
+
+			float vBuff[3];
+			vBuff[0] = vMins[0] + vMaxs[0];
+			vBuff[1] = vMins[1] + vMaxs[1];
+			vBuff[2] = vMins[2] + vMaxs[2];
+
+			DispatchSpawn(entity);
+			ActivateEntity(entity);
+			TeleportEntity(entity, vBuff, NULL_VECTOR, NULL_VECTOR);
+
+			RemoveEntity(entity);
+		}
+	}
 }
 
 void DownloadSkyboxes()

@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.12"
+#define PLUGIN_VERSION		"1.13"
 #define DEBUG_LOGGING		false
 
 /*=======================================================================================
@@ -33,7 +33,11 @@
 ========================================================================================
 	Change Log:
 
-1.12 (20-May-2025)
+1.13 (11-Jun-2025)
+	- Truncated menu entries to prevent overflowing the menu text and not displaying "previous", "next" and "exit" options.
+
+1.12 (21-May-2025)
+	- Fixed delayed commands triggering after a round restart or map change. Thanks to "Tighty-Whitey" for reporting.
 
 1.11 (15-Dec-2024)
 	- Fixed delayed commands not always working. Thanks to "PVNDV" for fixing.
@@ -1170,7 +1174,7 @@ void ShowMenuTrigList(int client, int index)
 
 	int count;
 	Menu hMenu = new Menu(TrigListMenuHandler);
-	char sIndex[4], sTemp[64];
+	char sIndex[4], sTemp[58];
 
 	g_iMenuEdit[client] = 0;
 
