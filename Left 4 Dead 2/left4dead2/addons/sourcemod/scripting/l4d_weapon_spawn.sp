@@ -122,8 +122,8 @@
 
 #define CVAR_FLAGS			FCVAR_NOTIFY
 #define CHAT_TAG			"\x04[\x05Weapon Spawn\x04] \x01"
-#define CONFIG_SPAWNS		"data/l4d_spawn_weapontwo.cfg"
-#define MAX_SPAWNS			64
+#define CONFIG_SPAWNS		"data/l4d_spawn_weapon.cfg"
+#define MAX_SPAWNS			32
 #define	MAX_WEAPONS			10
 #define	MAX_WEAPONS2		29
 
@@ -302,20 +302,20 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	// Cvars
-	g_hCvarAllow =		CreateConVar(	"l4d_weapon_spawntwo_allow",			"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
+	g_hCvarAllow =		CreateConVar(	"l4d_weapon_spawn_allow",			"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
 	if( g_bLeft4Dead2 )
 	{
-	g_hCvarGlow =		CreateConVar(	"l4d_weapon_spawntwo_glow",			"100",			"0=Off. Any other value is the range at which the glow will turn on.", CVAR_FLAGS );
-	g_hCvarGlowCol =	CreateConVar(	"l4d_weapon_spawntwo_glow_color",		"0 255 0",		"0=Default glow color. Three values between 0-255 separated by spaces. RGB Color255 - Red Green Blue.", CVAR_FLAGS );
+	g_hCvarGlow =		CreateConVar(	"l4d_weapon_spawn_glow",			"100",			"0=Off. Any other value is the range at which the glow will turn on.", CVAR_FLAGS );
+	g_hCvarGlowCol =	CreateConVar(	"l4d_weapon_spawn_glow_color",		"0 255 0",		"0=Default glow color. Three values between 0-255 separated by spaces. RGB Color255 - Red Green Blue.", CVAR_FLAGS );
 	}
-	g_hCvarModes =		CreateConVar(	"l4d_weapon_spawntwo_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
-	g_hCvarModesOff =	CreateConVar(	"l4d_weapon_spawntwo_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
-	g_hCvarModesTog =	CreateConVar(	"l4d_weapon_spawntwo_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
-	g_hCvarCount =		CreateConVar(	"l4d_weapon_spawntwo_count",			"1",			"0=Infinite. How many items/weapons to give from 1 spawner.", CVAR_FLAGS );
-	g_hCvarRandom =		CreateConVar(	"l4d_weapon_spawntwo_random",			"-1",			"-1=All, 0=None. Otherwise randomly select this many weapons to spawn from the maps config.", CVAR_FLAGS );
-	g_hCvarRandomise =	CreateConVar(	"l4d_weapon_spawntwo_randomise",		"25",			"0=Off. Chance out of 100 to randomise the type of item/weapon regardless of what it's set to.", CVAR_FLAGS );
-	CreateConVar(						"l4d_weapon_spawntwo_version",			PLUGIN_VERSION, "Weapon Spawn plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	AutoExecConfig(true,				"l4d_weapon_spawntwo");
+	g_hCvarModes =		CreateConVar(	"l4d_weapon_spawn_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
+	g_hCvarModesOff =	CreateConVar(	"l4d_weapon_spawn_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
+	g_hCvarModesTog =	CreateConVar(	"l4d_weapon_spawn_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
+	g_hCvarCount =		CreateConVar(	"l4d_weapon_spawn_count",			"1",			"0=Infinite. How many items/weapons to give from 1 spawner.", CVAR_FLAGS );
+	g_hCvarRandom =		CreateConVar(	"l4d_weapon_spawn_random",			"-1",			"-1=All, 0=None. Otherwise randomly select this many weapons to spawn from the maps config.", CVAR_FLAGS );
+	g_hCvarRandomise =	CreateConVar(	"l4d_weapon_spawn_randomise",		"25",			"0=Off. Chance out of 100 to randomise the type of item/weapon regardless of what it's set to.", CVAR_FLAGS );
+	CreateConVar(						"l4d_weapon_spawn_version",			PLUGIN_VERSION, "Weapon Spawn plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	AutoExecConfig(true,				"l4d_weapon_spawn");
 	SetRandomSeed(GetTime());
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
@@ -367,14 +367,14 @@ public void OnPluginStart()
 
 	// Commands
 	RegAdminCmd("sm_weapon_spawn",			CmdSpawnerTemp,		ADMFLAG_ROOT, 	"Opens a menu of weapons/items to spawn. Spawns a temporary weapon at your crosshair.");
-	RegAdminCmd("sm_weapon_spawn_savetwo",		CmdSpawnerSave,		ADMFLAG_ROOT, 	"Opens a menu of weapons/items to spawn. Spawns a weapon at your crosshair and saves to config.");
+	RegAdminCmd("sm_weapon_spawn_save",		CmdSpawnerSave,		ADMFLAG_ROOT, 	"Opens a menu of weapons/items to spawn. Spawns a weapon at your crosshair and saves to config.");
 	RegAdminCmd("sm_weapon_spawn_del",		CmdSpawnerDel,		ADMFLAG_ROOT, 	"Removes the weapon you are pointing at and deletes from the config if saved.");
 	RegAdminCmd("sm_weapon_spawn_clear",	CmdSpawnerClear,	ADMFLAG_ROOT, 	"Removes all weapons spawned by this plugin from the current map.");
 	RegAdminCmd("sm_weapon_spawn_wipe",		CmdSpawnerWipe,		ADMFLAG_ROOT, 	"Removes all weapons spawned by this plugin from the current map and deletes them from the config.");
 	if( g_bLeft4Dead2 )
 		RegAdminCmd("sm_weapon_spawn_glow",	CmdSpawnerGlow,		ADMFLAG_ROOT, 	"Toggle to enable glow on all weapons to see where they are placed.");
 	RegAdminCmd("sm_weapon_spawn_list",		CmdSpawnerList,		ADMFLAG_ROOT, 	"Display a list weapon positions and the total number of.");
-	RegAdminCmd("sm_weapon_spawn_tele",		CmdSpawnerTele,		ADMFLAG_ROOT, 	"Teleport to a weapon (Usage: sm_weapon_spawntwo_tele <index: 1 to MAX_SPAWNS (64)>).");
+	RegAdminCmd("sm_weapon_spawn_tele",		CmdSpawnerTele,		ADMFLAG_ROOT, 	"Teleport to a weapon (Usage: sm_weapon_spawn_tele <index: 1 to MAX_SPAWNS (32)>).");
 	RegAdminCmd("sm_weapon_spawn_ang",		CmdSpawnerAng,		ADMFLAG_ROOT, 	"Displays a menu to adjust the weapon angles your crosshair is over.");
 	RegAdminCmd("sm_weapon_spawn_rot",		CmdSpawnerRot,		ADMFLAG_ROOT, 	"Rotate weapon. Usage: sm_weapon_spawn_rot {x|y|z|} {degree}");
 	RegAdminCmd("sm_weapon_spawn_pos",		CmdSpawnerPos,		ADMFLAG_ROOT, 	"Displays a menu to adjust the weapon origin your crosshair is over.");

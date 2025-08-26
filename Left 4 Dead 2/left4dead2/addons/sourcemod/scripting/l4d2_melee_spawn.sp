@@ -1,6 +1,6 @@
 /*
-*	Weapon Spawn
-*	Copyright (C) 2025 Silvers
+*	Melee Weapon Spawner
+*	Copyright (C) 2023 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,84 +18,48 @@
 
 
 
-#define PLUGIN_VERSION 		"1.16"
+#define PLUGIN_VERSION 		"1.8"
 
 /*======================================================================================
 	Plugin Info:
 
-*	Name	:	[L4D & L4D2] Weapon Spawn
+*	Name	:	[L4D2] Melee Weapon Spawner
 *	Author	:	SilverShot
-*	Descrp	:	Spawns a single weapon fixed in position, these can be temporary or saved for auto-spawning.
-*	Link	:	https://forums.alliedmods.net/showthread.php?t=222934
+*	Descrp	:	Spawns a single melee weapon fixed in position, these can be temporary or saved for auto-spawning.
+*	Link	:	https://forums.alliedmods.net/showthread.php?t=223020
 *	Plugins	:	https://sourcemod.net/plugins.php?exact=exact&sortby=title&search=1&author=Silvers
 
 ========================================================================================
 	Change Log:
 
-1.16 (21-Mar-2025)
-	- Fixed the M60 spawning a Scout weapon when the "_count" cvar was not set to 1. Thanks to "Mizuki" for reporting.
+1.8 (19-Sep-2023)
+	- Fixed not precaching the Knife model.
 
-1.15 (25-Mar-2024)
-	- Changes to fix conflicts with the "ConVars Anomaly Fixer" plugin. Thanks to "komikoza" for reporting and testing.
+1.7 (11-Dec-2022)
+	- Various changes to tidy up code.
 
-1.14 (25-May-2023)
-	- Fixed the M60, Grenade Launcher and Chainsaw not following the count cvar limit. Thanks to "gamer_kanelita" for reporting.
-
-1.13 (20-Sep-2022)
-	- Fixed incorrect model list. Thanks to "HarryPotter" for reporting.
-
-1.12 (10-Aug-2022)
-	- Fixed the plugin attempting to back up the data file even after converting to version 2 format. Thanks to "HarryPotter" for reporting.
-
-1.11 (04-Jun-2022)
-	- Fixed not updating the full data config if an index was missing. Now throws errors to warn about missing indexes.
-	- Plugin will auto backs up the previous data config before updating it.
-
-1.10 (04-Jun-2022)
-	- L4D2: Plugin now automatically converts old /data/ configs to use the new index values. Previous version was spawning the wrong types.
-	- Thanks to "KoMiKoZa" for reporting.
-
-1.9 (26-May-2022)
-	- Changed the menu order of items to group similar types together.
+1.6 (26-May-2022)
 	- Menu now displays the last page that was selected instead of returning to the first page.
 
-1.8 (23-Apr-2022)
-	- Changes to allow "CSS" weapons to spawn multiple copies with the "l4d_weapon_spawn_count" cvar. Thanks to "vikingo12" for reporting.
+1.5 (24-Sep-2020)
+	- Compatibility update for L4D2's "The Last Stand" update.
+	- Added support for the 2 new melee weapons.
 
-1.7 (15-Feb-2021)
-	- Added new command "sm_weapon_spawn_mov" for direct console control of position. Thanks to "eyeonus" for scripting.
-	- Added new command "sm_weapon_spawn_rot" for direct console control of rotation. Thanks to "eyeonus" for scripting.
-	- Fixed invalid convar handles in L4D1. Thanks to "CryWolf" for reporting.
-
-1.6 (10-May-2020)
-	- Blocked glow command and convars from L4D1 which does not support glows.
+1.4 (10-May-2020)
 	- Extra checks to prevent "IsAllowedGameMode" throwing errors.
 	- Various changes to tidy up code.
-	- Various optimizations and fixes.
 
-1.5 (01-Apr-2020)
+1.3 (01-Apr-2020)
 	- Fixed "IsAllowedGameMode" from throwing errors when the "_tog" cvar was changed before MapStart.
 
-1.4 (05-May-2018)
+1.2 (05-May-2018)
 	- Converted plugin source to the latest syntax utilizing methodmaps. Requires SourceMod 1.8 or newer.
-	- Changed cvar "l4d_weapon_spawn_modes_tog" now supports L4D1.
 
-1.3.2 (20-May-2017)
-	- Added cvar "l4d_weapon_spawn_glow" to set the glow color.
+1.1.1 (18-Aug-2013)
+	- Changed the randomise slightly so melee spawn positions are better.
 
-1.3.1 (20-Nov-2015)
-	- Fixed the Sniper Scout not spawning when "l4d_weapon_spawn_count" cvar was set to 0.
-
-1.3 (19-Nov-2015)
-	- Fixed Auto Shotgun ammo in L4D1 not filling.
-	- Fixed some guns not spawning when "l4d_weapon_spawn_count" cvar was set to 0.
-
-1.2 (29-Mar-2015)
-	- Fixed the plugin not loading in L4D1 due to an Invalid Convar Handle.
-
-1.1 (18-Aug-2013)
-	- Added cvar "l4d_weapon_spawn_count" to set how many times a spawner gives items/weapons before disappearing.
-	- Added cvar "l4d_weapon_spawn_randomise" to randomise the spawns based on a chance out of 100.
+1.1 (09-Aug-2013)
+	- Added cvar "l4d2_melee_spawn_randomise" to randomise the spawns based on a chance out of 100.
 
 1.0 (09-Aug-2013)
 	- Initial release.
@@ -109,7 +73,7 @@
 *	"Zuko & McFlurry" for "[L4D2] Weapon/Zombie Spawner" - Modified SetTeleportEndPoint function.
 	https://forums.alliedmods.net/showthread.php?t=109659
 
-*	Thanks to "Boikinov" for "[L4D] Left FORT Dead builder" - RotateYaw function to rotate ground flares
+*	Thanks to "Boikinov" for "[L4D] Left FORT Dead builder" - RotateYaw function
 	https://forums.alliedmods.net/showthread.php?t=93716
 
 ======================================================================================*/
@@ -121,155 +85,50 @@
 #include <sdktools>
 
 #define CVAR_FLAGS			FCVAR_NOTIFY
-#define CHAT_TAG			"\x04[\x05Weapon Spawn\x04] \x01"
-#define CONFIG_SPAWNS		"data/l4d_spawn_weapontwo.cfg"
-#define MAX_SPAWNS			64
-#define	MAX_WEAPONS			10
-#define	MAX_WEAPONS2		29
+#define CHAT_TAG			"\x04[\x05Melee Spawn\x04] \x01"
+#define CONFIG_SPAWNS		"data/l4d2_melee_spawn.cfg"
+#define MAX_SPAWNS			32
+#define	MAX_MELEE			13
 
 
-ConVar g_hCvarAllow, g_hCvarCount, g_hCvarGlow, g_hCvarGlowCol, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarRandom, g_hCvarRandomise;
-int g_iCvarCount, g_iCvarGlow, g_iCvarGlowCol, g_iCvarRandom, g_iCvarRandomise, g_iPlayerSpawn, g_iRoundStart, g_iSave[MAXPLAYERS+1], g_iSpawnCount, g_iSpawns[MAX_SPAWNS][3];
-bool g_bCvarAllow, g_bMapStarted, g_bLeft4Dead2, g_bLoaded;
 Menu g_hMenuAng, g_hMenuList, g_hMenuPos;
+ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarRandom, g_hCvarRandomise;
+int g_iCvarRandom, g_iCvarRandomise, g_iPlayerSpawn, g_iRoundStart, g_iSave[MAXPLAYERS+1], g_iSpawnCount, g_iSpawns[MAX_SPAWNS][2];
+bool g_bCvarAllow, g_bMapStarted, g_bLoaded;
 
-ConVar g_hAmmoAutoShot, g_hAmmoChainsaw, g_hAmmoGL, g_hAmmoHunting, g_hAmmoM60, g_hAmmoRifle, g_hAmmoShotgun, g_hAmmoSmg, g_hAmmoSniper;
-int g_iAmmoAutoShot, g_iAmmoChainsaw, g_iAmmoGL, g_iAmmoHunting, g_iAmmoM60, g_iAmmoRifle, g_iAmmoShotgun, g_iAmmoSmg, g_iAmmoSniper;
-
-static char g_sWeaponNames[MAX_WEAPONS][] =
+char g_sWeaponNames[MAX_MELEE][] =
 {
-	"Rifle",
-	"Auto Shotgun",
-	"Hunting Rifle",
-	"SMG",
-	"Pump Shotgun",
-	"Pistol",
-	"Molotov",
-	"Pipe Bomb",
-	"First Aid Kit",
-	"Pain Pills"
+	"Axe",
+	"Baseball Bat",
+	"Cricket Bat",
+	"Crowbar",
+	"Frying Pan",
+	"Golf Club",
+	"Guitar",
+	"Katana",
+	"Machete",
+	"Nightstick",
+	"Knife",
+	"Pitchfork",
+	"Shovel"
+	// "Shield"
 };
-static char g_sWeapons[MAX_WEAPONS][] =
+char g_sScripts[MAX_MELEE][] =
 {
-	"weapon_rifle",
-	"weapon_autoshotgun",
-	"weapon_hunting_rifle",
-	"weapon_smg",
-	"weapon_pumpshotgun",
-	"weapon_pistol",
-	"weapon_molotov",
-	"weapon_pipe_bomb",
-	"weapon_first_aid_kit",
-	"weapon_pain_pills"
-};
-static char g_sWeaponModels[MAX_WEAPONS][] =
-{
-	"models/w_models/weapons/w_rifle_m16a2.mdl",
-	"models/w_models/weapons/w_autoshot_m4super.mdl",
-	"models/w_models/weapons/w_sniper_mini14.mdl",
-	"models/w_models/weapons/w_smg_uzi.mdl",
-	"models/w_models/weapons/w_shotgun.mdl",
-	"models/w_models/weapons/w_pistol_1911.mdl",
-	"models/w_models/weapons/w_eq_molotov.mdl",
-	"models/w_models/weapons/w_eq_pipebomb.mdl",
-	"models/w_models/weapons/w_eq_medkit.mdl",
-	"models/w_models/weapons/w_eq_painpills.mdl"
-};
-static char g_sWeaponNames2[MAX_WEAPONS2][] =
-{
-	"Pistol",
-	"Pistol Magnum",
-	"Rifle",
-	"AK47",
-	"SG552",
-	"Rifle Desert",
-	"Auto Shotgun",
-	"Shotgun Spas",
-	"Pump Shotgun",
-	"Shotgun Chrome",
-	"SMG",
-	"SMG Silenced",
-	"SMG MP5",
-	"Hunting Rifle",
-	"Sniper AWP",
-	"Sniper Military",
-	"Sniper Scout",
-	"M60",
-	"Grenade Launcher",
-	"Chainsaw",
-	"Molotov",
-	"Pipe Bomb",
-	"VomitJar",
-	"Pain Pills",
-	"Adrenaline",
-	"First Aid Kit",
-	"Defibrillator",
-	"Upgradepack Explosive",
-	"Upgradepack Incendiary"
-};
-static char g_sWeapons2[MAX_WEAPONS2][] =
-{
-	"weapon_pistol",
-	"weapon_pistol_magnum",
-	"weapon_rifle",
-	"weapon_rifle_ak47",
-	"weapon_rifle_sg552",
-	"weapon_rifle_desert",
-	"weapon_autoshotgun",
-	"weapon_shotgun_spas",
-	"weapon_pumpshotgun",
-	"weapon_shotgun_chrome",
-	"weapon_smg",
-	"weapon_smg_silenced",
-	"weapon_smg_mp5",
-	"weapon_hunting_rifle",
-	"weapon_sniper_awp",
-	"weapon_sniper_military",
-	"weapon_sniper_scout",
-	"weapon_rifle_m60",
-	"weapon_grenade_launcher",
-	"weapon_chainsaw",
-	"weapon_molotov",
-	"weapon_pipe_bomb",
-	"weapon_vomitjar",
-	"weapon_pain_pills",
-	"weapon_adrenaline",
-	"weapon_first_aid_kit",
-	"weapon_defibrillator",
-	"weapon_upgradepack_explosive",
-	"weapon_upgradepack_incendiary"
-};
-static char g_sWeaponModels2[MAX_WEAPONS2][] =
-{
-	"models/w_models/weapons/w_pistol_b.mdl",
-	"models/w_models/weapons/w_desert_eagle.mdl",
-	"models/w_models/weapons/w_rifle_m16a2.mdl",
-	"models/w_models/weapons/w_rifle_ak47.mdl",
-	"models/w_models/weapons/w_rifle_sg552.mdl",
-	"models/w_models/weapons/w_desert_rifle.mdl",
-	"models/w_models/weapons/w_autoshot_m4super.mdl",
-	"models/w_models/weapons/w_shotgun_spas.mdl",
-	"models/w_models/weapons/w_shotgun.mdl",
-	"models/w_models/weapons/w_pumpshotgun_a.mdl",
-	"models/w_models/weapons/w_smg_uzi.mdl",
-	"models/w_models/weapons/w_smg_a.mdl",
-	"models/w_models/weapons/w_smg_mp5.mdl",
-	"models/w_models/weapons/w_sniper_mini14.mdl",
-	"models/w_models/weapons/w_sniper_awp.mdl",
-	"models/w_models/weapons/w_sniper_military.mdl",
-	"models/w_models/weapons/w_sniper_scout.mdl",
-	"models/w_models/weapons/w_m60.mdl",
-	"models/w_models/weapons/w_grenade_launcher.mdl",
-	"models/weapons/melee/w_chainsaw.mdl",
-	"models/w_models/weapons/w_eq_molotov.mdl",
-	"models/w_models/weapons/w_eq_pipebomb.mdl",
-	"models/w_models/weapons/w_eq_bile_flask.mdl",
-	"models/w_models/weapons/w_eq_painpills.mdl",
-	"models/w_models/weapons/w_eq_adrenaline.mdl",
-	"models/w_models/weapons/w_eq_medkit.mdl",
-	"models/w_models/weapons/w_eq_defibrillator.mdl",
-	"models/w_models/weapons/w_eq_explosive_ammopack.mdl",
-	"models/w_models/weapons/w_eq_incendiary_ammopack.mdl"
+	"fireaxe",
+	"baseball_bat",
+	"cricket_bat",
+	"crowbar",
+	"frying_pan",
+	"golfclub",
+	"electric_guitar",
+	"katana",
+	"machete",
+	"tonfa",
+	"knife",
+	"pitchfork",
+	"shovel"
+	// "riotshield"
 };
 
 
@@ -279,21 +138,19 @@ static char g_sWeaponModels2[MAX_WEAPONS2][] =
 // ====================================================================================================
 public Plugin myinfo =
 {
-	name = "[L4D & L4D2] Weapon Spawn",
+	name = "[L4D2] Melee Weapon Spawner",
 	author = "SilverShot",
-	description = "Spawns a weapon in a weapon crate/locker, these can be temporary or saved for auto-spawning.",
+	description = "Spawns a single melee weapon fixed in position, these can be temporary or saved for auto-spawning.",
 	version = PLUGIN_VERSION,
-	url = "https://forums.alliedmods.net/showthread.php?t=222934"
+	url = "https://forums.alliedmods.net/showthread.php?t=223020"
 }
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	EngineVersion test = GetEngineVersion();
-	if( test == Engine_Left4Dead ) g_bLeft4Dead2 = false;
-	else if( test == Engine_Left4Dead2 ) g_bLeft4Dead2 = true;
-	else
+	if( test != Engine_Left4Dead2 )
 	{
-		strcopy(error, err_max, "Plugin only supports Left 4 Dead 1 & 2.");
+		strcopy(error, err_max, "Plugin only supports Left 4 Dead 2.");
 		return APLRes_SilentFailure;
 	}
 	return APLRes_Success;
@@ -301,21 +158,14 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	// Cvars
-	g_hCvarAllow =		CreateConVar(	"l4d_weapon_spawntwo_allow",			"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
-	if( g_bLeft4Dead2 )
-	{
-	g_hCvarGlow =		CreateConVar(	"l4d_weapon_spawntwo_glow",			"100",			"0=Off. Any other value is the range at which the glow will turn on.", CVAR_FLAGS );
-	g_hCvarGlowCol =	CreateConVar(	"l4d_weapon_spawntwo_glow_color",		"0 255 0",		"0=Default glow color. Three values between 0-255 separated by spaces. RGB Color255 - Red Green Blue.", CVAR_FLAGS );
-	}
-	g_hCvarModes =		CreateConVar(	"l4d_weapon_spawntwo_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
-	g_hCvarModesOff =	CreateConVar(	"l4d_weapon_spawntwo_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
-	g_hCvarModesTog =	CreateConVar(	"l4d_weapon_spawntwo_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
-	g_hCvarCount =		CreateConVar(	"l4d_weapon_spawntwo_count",			"1",			"0=Infinite. How many items/weapons to give from 1 spawner.", CVAR_FLAGS );
-	g_hCvarRandom =		CreateConVar(	"l4d_weapon_spawntwo_random",			"-1",			"-1=All, 0=None. Otherwise randomly select this many weapons to spawn from the maps config.", CVAR_FLAGS );
-	g_hCvarRandomise =	CreateConVar(	"l4d_weapon_spawntwo_randomise",		"25",			"0=Off. Chance out of 100 to randomise the type of item/weapon regardless of what it's set to.", CVAR_FLAGS );
-	CreateConVar(						"l4d_weapon_spawntwo_version",			PLUGIN_VERSION, "Weapon Spawn plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	AutoExecConfig(true,				"l4d_weapon_spawntwo");
+	g_hCvarAllow =		CreateConVar(	"l4d2_melee_spawn_allow",			"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
+	g_hCvarModes =		CreateConVar(	"l4d2_melee_spawn_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
+	g_hCvarModesOff =	CreateConVar(	"l4d2_melee_spawn_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
+	g_hCvarModesTog =	CreateConVar(	"l4d2_melee_spawn_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
+	g_hCvarRandom =		CreateConVar(	"l4d2_melee_spawn_random",			"-1",			"-1=All, 0=None. Otherwise randomly select this many melee weapons to spawn from the maps config.", CVAR_FLAGS );
+	g_hCvarRandomise =	CreateConVar(	"l4d2_melee_spawn_randomise",		"25",			"0=Off. Chance out of 100 to randomise the type of melee weapon regardless of what it's set to.", CVAR_FLAGS );
+	CreateConVar(						"l4d2_melee_spawn_version",			PLUGIN_VERSION, "Melee Weapon Spawner plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	AutoExecConfig(true,				"l4d2_melee_spawn");
 	SetRandomSeed(GetTime());
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
@@ -324,149 +174,29 @@ public void OnPluginStart()
 	g_hCvarModes.AddChangeHook(ConVarChanged_Allow);
 	g_hCvarModesOff.AddChangeHook(ConVarChanged_Allow);
 	g_hCvarModesTog.AddChangeHook(ConVarChanged_Allow);
-	g_hCvarCount.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarRandom.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarRandomise.AddChangeHook(ConVarChanged_Cvars);
-	
-	if( g_bLeft4Dead2 )
-	{
-		g_hCvarGlow.AddChangeHook(ConVarChanged_Glow);
-		g_hCvarGlowCol.AddChangeHook(ConVarChanged_Glow);
-	}
 
-
-	g_hAmmoRifle =			FindConVar("ammo_assaultrifle_max");
-	g_hAmmoSmg =			FindConVar("ammo_smg_max");
-	g_hAmmoHunting =		FindConVar("ammo_huntingrifle_max");
-
-	g_hAmmoRifle.AddChangeHook(ConVarChanged_Cvars);
-	g_hAmmoSmg.AddChangeHook(ConVarChanged_Cvars);
-	g_hAmmoHunting.AddChangeHook(ConVarChanged_Cvars);
-
-	if( g_bLeft4Dead2 )
-	{
-		g_hAmmoShotgun =	FindConVar("ammo_shotgun_max");
-		g_hAmmoGL =			FindConVar("ammo_grenadelauncher_max");
-		g_hAmmoChainsaw =	FindConVar("ammo_chainsaw_max");
-		g_hAmmoAutoShot =	FindConVar("ammo_autoshotgun_max");
-		g_hAmmoM60 =		FindConVar("ammo_m60_max");
-		g_hAmmoSniper =		FindConVar("ammo_sniperrifle_max");
-
-		g_hAmmoGL.AddChangeHook(ConVarChanged_Cvars);
-		g_hAmmoChainsaw.AddChangeHook(ConVarChanged_Cvars);
-		g_hAmmoAutoShot.AddChangeHook(ConVarChanged_Cvars);
-		g_hAmmoM60.AddChangeHook(ConVarChanged_Cvars);
-		g_hAmmoSniper.AddChangeHook(ConVarChanged_Cvars);
-	} else {
-		g_hAmmoShotgun =	FindConVar("ammo_buckshot_max");
-	}
-
-	g_hAmmoShotgun.AddChangeHook(ConVarChanged_Cvars);
+	RegAdminCmd("sm_melee_spawn",			CmdSpawnerTemp,		ADMFLAG_ROOT, 	"Opens a menu of melee weapons to spawn. Spawns a temporary melee weapon at your crosshair.");
+	RegAdminCmd("sm_melee_spawn_save",		CmdSpawnerSave,		ADMFLAG_ROOT, 	"Opens a menu of melee weapons to spawn. Spawns a melee weapon at your crosshair and saves to config.");
+	RegAdminCmd("sm_melee_spawn_del",		CmdSpawnerDel,		ADMFLAG_ROOT, 	"Removes the melee weapon you are pointing at and deletes from the config if saved.");
+	RegAdminCmd("sm_melee_spawn_clear",		CmdSpawnerClear,	ADMFLAG_ROOT, 	"Removes all melee weapons spawned by this plugin from the current map.");
+	RegAdminCmd("sm_melee_spawn_wipe",		CmdSpawnerWipe,		ADMFLAG_ROOT, 	"Removes all melee weapons spawned by this plugin from the current map and deletes them from the config.");
+	RegAdminCmd("sm_melee_spawn_glow",		CmdSpawnerGlow,		ADMFLAG_ROOT, 	"Toggle to enable glow on all melee weapons to see where they are placed.");
+	RegAdminCmd("sm_melee_spawn_list",		CmdSpawnerList,		ADMFLAG_ROOT, 	"Display a list melee weapon positions and the total number of.");
+	RegAdminCmd("sm_melee_spawn_tele",		CmdSpawnerTele,		ADMFLAG_ROOT, 	"Teleport to a melee weapon (Usage: sm_melee_spawn_tele <index: 1 to MAX_SPAWNS (32)>).");
+	RegAdminCmd("sm_melee_spawn_ang",		CmdSpawnerAng,		ADMFLAG_ROOT, 	"Displays a menu to adjust the melee weapon angles your crosshair is over.");
+	RegAdminCmd("sm_melee_spawn_pos",		CmdSpawnerPos,		ADMFLAG_ROOT, 	"Displays a menu to adjust the melee weapon origin your crosshair is over.");
 
 
 
-	// Commands
-	RegAdminCmd("sm_weapon_spawn",			CmdSpawnerTemp,		ADMFLAG_ROOT, 	"Opens a menu of weapons/items to spawn. Spawns a temporary weapon at your crosshair.");
-	RegAdminCmd("sm_weapon_spawn_savetwo",		CmdSpawnerSave,		ADMFLAG_ROOT, 	"Opens a menu of weapons/items to spawn. Spawns a weapon at your crosshair and saves to config.");
-	RegAdminCmd("sm_weapon_spawn_del",		CmdSpawnerDel,		ADMFLAG_ROOT, 	"Removes the weapon you are pointing at and deletes from the config if saved.");
-	RegAdminCmd("sm_weapon_spawn_clear",	CmdSpawnerClear,	ADMFLAG_ROOT, 	"Removes all weapons spawned by this plugin from the current map.");
-	RegAdminCmd("sm_weapon_spawn_wipe",		CmdSpawnerWipe,		ADMFLAG_ROOT, 	"Removes all weapons spawned by this plugin from the current map and deletes them from the config.");
-	if( g_bLeft4Dead2 )
-		RegAdminCmd("sm_weapon_spawn_glow",	CmdSpawnerGlow,		ADMFLAG_ROOT, 	"Toggle to enable glow on all weapons to see where they are placed.");
-	RegAdminCmd("sm_weapon_spawn_list",		CmdSpawnerList,		ADMFLAG_ROOT, 	"Display a list weapon positions and the total number of.");
-	RegAdminCmd("sm_weapon_spawn_tele",		CmdSpawnerTele,		ADMFLAG_ROOT, 	"Teleport to a weapon (Usage: sm_weapon_spawntwo_tele <index: 1 to MAX_SPAWNS (64)>).");
-	RegAdminCmd("sm_weapon_spawn_ang",		CmdSpawnerAng,		ADMFLAG_ROOT, 	"Displays a menu to adjust the weapon angles your crosshair is over.");
-	RegAdminCmd("sm_weapon_spawn_rot",		CmdSpawnerRot,		ADMFLAG_ROOT, 	"Rotate weapon. Usage: sm_weapon_spawn_rot {x|y|z|} {degree}");
-	RegAdminCmd("sm_weapon_spawn_pos",		CmdSpawnerPos,		ADMFLAG_ROOT, 	"Displays a menu to adjust the weapon origin your crosshair is over.");
-	RegAdminCmd("sm_weapon_spawn_mov",		CmdSpawnerMov,		ADMFLAG_ROOT, 	"Move weapon. Usage: sm_weapon_spawn_mov {x|y|z} {distance}");
-
-
-
-	// Menu
 	g_hMenuList = new Menu(ListMenuHandler);
-	int max = MAX_WEAPONS;
-	if( g_bLeft4Dead2 ) max = MAX_WEAPONS2;
-	for( int i = 0; i < max; i++ )
+	for( int i = 0; i < MAX_MELEE; i++ )
 	{
-		g_hMenuList.AddItem("", g_bLeft4Dead2 ? g_sWeaponNames2[i] : g_sWeaponNames[i]);
+		g_hMenuList.AddItem("", g_sWeaponNames[i]);
 	}
-	g_hMenuList.SetTitle("Spawn Weapon");
+	g_hMenuList.SetTitle("Spawn Melee");
 	g_hMenuList.ExitBackButton = true;
-
-
-
-	// Config version
-	if( g_bLeft4Dead2 )
-	{
-		int iMod, iNum, iIndex;
-		bool process;
-		char sKey[128];
-		char sPath[PLATFORM_MAX_PATH];
-		BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_SPAWNS);
-		if( FileExists(sPath) )
-		{
-			// Load config
-			KeyValues hFile = new KeyValues("spawns");
-			if( hFile.ImportFromFile(sPath) )
-			{
-				// Version check
-				if( hFile.GetNum("version", 1) != 2 )
-				{
-					char sNew[PLATFORM_MAX_PATH];
-					BuildPath(Path_SM, sNew, sizeof(sNew), "%s.backup", CONFIG_SPAWNS);
-					RenameFile(sNew, sPath);
-
-					int iNew[] = { 2, 6, 13, 10, 8, 0, 20, 21, 25, 23, 9, 5, 18, 17, 3, 4, 7, 11, 12, 14, 15, 16, 19, 1, 22, 26, 27, 28, 24 };
-
-					hFile.GotoFirstSubKey(false);
-					process = true;
-
-					while( process )
-					{
-						// hFile.GetSectionName(sKey, sizeof(sKey));
-						// PrintToServer("Section: %s", sKey);
-
-						iNum = hFile.GetNum("num", 0);
-						iIndex = 0;
-						while( iIndex < iNum )
-						{
-							iIndex++;
-							IntToString(iIndex, sKey, sizeof(sKey));
-
-							if( hFile.JumpToKey(sKey) )
-							{
-								iMod = hFile.GetNum("mod", -1);
-								if( iMod != -1 )
-								{
-									// PrintToServer("New: %s (%d > %d)", sKey, iMod, iNew[iMod]);
-									iMod = iNew[iMod];
-									hFile.SetNum("mod", iMod);
-								}
-
-								hFile.GoBack();
-							} else {
-								hFile.GetSectionName(sKey, sizeof(sKey));
-								LogError("Update warning: missing index detected: \"%d\" from \"%s\" in \"%s\". Suggest manually fixing, this could break some functionality.", iIndex, sKey, CONFIG_SPAWNS);
-							}
-						}
-
-						if( !hFile.GotoNextKey(false) )
-						{
-							process = false;
-						}
-					}
-
-					// Save cfg
-					hFile.GoBack();
-					hFile.SetNum("version", 2);
-					hFile.Rewind();
-					hFile.ExportToFile(sPath);
-				}
-			}
-
-			delete hFile;
-		}
-	}
 }
 
 public void OnPluginEnd()
@@ -477,12 +207,49 @@ public void OnPluginEnd()
 public void OnMapStart()
 {
 	g_bMapStarted = true;
-	int max = MAX_WEAPONS;
-	if( g_bLeft4Dead2 ) max = MAX_WEAPONS2;
-	for( int i = 0; i < max; i++ )
-	{
-		PrecacheModel(g_bLeft4Dead2 ? g_sWeaponModels2[i] : g_sWeaponModels[i], true);
-	}
+
+	// Taken from MeleeInTheSaferoom
+	PrecacheModel("models/weapons/melee/v_bat.mdl", true);
+	PrecacheModel("models/weapons/melee/v_cricket_bat.mdl", true);
+	PrecacheModel("models/weapons/melee/v_crowbar.mdl", true);
+	PrecacheModel("models/weapons/melee/v_electric_guitar.mdl", true);
+	PrecacheModel("models/weapons/melee/v_fireaxe.mdl", true);
+	PrecacheModel("models/weapons/melee/v_frying_pan.mdl", true);
+	PrecacheModel("models/weapons/melee/v_golfclub.mdl", true);
+	PrecacheModel("models/weapons/melee/v_katana.mdl", true);
+	PrecacheModel("models/weapons/melee/v_knife_t.mdl", true);
+	PrecacheModel("models/weapons/melee/v_machete.mdl", true);
+	PrecacheModel("models/weapons/melee/v_tonfa.mdl", true);
+	PrecacheModel("models/weapons/melee/v_pitchfork.mdl", true);
+	PrecacheModel("models/weapons/melee/v_shovel.mdl", true);
+
+	PrecacheModel("models/weapons/melee/w_bat.mdl", true);
+	PrecacheModel("models/weapons/melee/w_cricket_bat.mdl", true);
+	PrecacheModel("models/weapons/melee/w_crowbar.mdl", true);
+	PrecacheModel("models/weapons/melee/w_electric_guitar.mdl", true);
+	PrecacheModel("models/weapons/melee/w_fireaxe.mdl", true);
+	PrecacheModel("models/weapons/melee/w_frying_pan.mdl", true);
+	PrecacheModel("models/weapons/melee/w_golfclub.mdl", true);
+	PrecacheModel("models/weapons/melee/w_katana.mdl", true);
+	PrecacheModel("models/weapons/melee/w_knife_t.mdl", true);
+	PrecacheModel("models/weapons/melee/w_machete.mdl", true);
+	PrecacheModel("models/weapons/melee/w_tonfa.mdl", true);
+	PrecacheModel("models/weapons/melee/w_pitchfork.mdl", true);
+	PrecacheModel("models/weapons/melee/w_shovel.mdl", true);
+
+	PrecacheGeneric("scripts/melee/baseball_bat.txt", true);
+	PrecacheGeneric("scripts/melee/cricket_bat.txt", true);
+	PrecacheGeneric("scripts/melee/crowbar.txt", true);
+	PrecacheGeneric("scripts/melee/electric_guitar.txt", true);
+	PrecacheGeneric("scripts/melee/fireaxe.txt", true);
+	PrecacheGeneric("scripts/melee/frying_pan.txt", true);
+	PrecacheGeneric("scripts/melee/golfclub.txt", true);
+	PrecacheGeneric("scripts/melee/katana.txt", true);
+	PrecacheGeneric("scripts/melee/knife.txt", true);
+	PrecacheGeneric("scripts/melee/machete.txt", true);
+	PrecacheGeneric("scripts/melee/tonfa.txt", true);
+	PrecacheGeneric("scripts/melee/pitchfork.txt", true);
+	PrecacheGeneric("scripts/melee/shovel.txt", true);
 }
 
 public void OnMapEnd()
@@ -511,53 +278,10 @@ void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newV
 	GetCvars();
 }
 
-void ConVarChanged_Glow(Handle convar, const char[] oldValue, const char[] newValue)
-{
-	g_iCvarGlow = g_hCvarGlow.IntValue;
-	g_iCvarGlowCol = GetColor(g_hCvarGlowCol);
-	VendorGlow(g_iCvarGlow);
-}
-
-int GetColor(ConVar hCvar)
-{
-	char sTemp[12];
-	hCvar.GetString(sTemp, sizeof(sTemp));
-
-	if( sTemp[0] == 0 )
-		return 0;
-
-	char sColors[3][4];
-	int color = ExplodeString(sTemp, " ", sColors, sizeof(sColors), sizeof(sColors[]));
-
-	if( color != 3 )
-		return 0;
-
-	color = StringToInt(sColors[0]);
-	color += 256 * StringToInt(sColors[1]);
-	color += 65536 * StringToInt(sColors[2]);
-
-	return color;
-}
-
 void GetCvars()
 {
-	g_iCvarCount = g_hCvarCount.IntValue;
 	g_iCvarRandom = g_hCvarRandom.IntValue;
 	g_iCvarRandomise = g_hCvarRandomise.IntValue;
-
-	g_iAmmoRifle		= g_hAmmoRifle.IntValue;
-	g_iAmmoShotgun		= g_hAmmoShotgun.IntValue;
-	g_iAmmoSmg			= g_hAmmoSmg.IntValue;
-	g_iAmmoHunting		= g_hAmmoHunting.IntValue;
-
-	if( g_bLeft4Dead2 )
-	{
-		g_iAmmoGL			= g_hAmmoGL.IntValue;
-		g_iAmmoChainsaw		= g_hAmmoChainsaw.IntValue;
-		g_iAmmoAutoShot		= g_hAmmoAutoShot.IntValue;
-		g_iAmmoM60			= g_hAmmoM60.IntValue;
-		g_iAmmoSniper		= g_hAmmoSniper.IntValue;
-	}
 }
 
 void IsAllowed()
@@ -568,10 +292,8 @@ void IsAllowed()
 
 	if( g_bCvarAllow == false && bCvarAllow == true && bAllowMode == true )
 	{
-		g_bCvarAllow = true;
 		LoadSpawns();
-		if( g_bLeft4Dead2 )
-			HookEvent("player_use",		Event_PlayerUse);
+		g_bCvarAllow = true;
 		HookEvent("player_spawn",		Event_PlayerSpawn,	EventHookMode_PostNoCopy);
 		HookEvent("round_start",		Event_RoundStart,	EventHookMode_PostNoCopy);
 		HookEvent("round_end",			Event_RoundEnd,		EventHookMode_PostNoCopy);
@@ -579,10 +301,8 @@ void IsAllowed()
 
 	else if( g_bCvarAllow == true && (bCvarAllow == false || bAllowMode == false) )
 	{
-		g_bCvarAllow = false;
 		ResetPlugin();
-		if( g_bLeft4Dead2 )
-			UnhookEvent("player_use",	Event_PlayerUse);
+		g_bCvarAllow = false;
 		UnhookEvent("player_spawn",		Event_PlayerSpawn,	EventHookMode_PostNoCopy);
 		UnhookEvent("round_start",		Event_RoundStart,	EventHookMode_PostNoCopy);
 		UnhookEvent("round_end",		Event_RoundEnd,		EventHookMode_PostNoCopy);
@@ -664,52 +384,6 @@ void OnGamemode(const char[] output, int caller, int activator, float delay)
 // ====================================================================================================
 //					EVENTS
 // ====================================================================================================
-// Re-create M60, Grenade Launcher and Chainsaw on pickup when set to inifinite/increased spawn count
-void Event_PlayerUse(Event event, const char[] name, bool dontBroadcast)
-{
-	int entity = event.GetInt("targetid");
-	if( entity > MaxClients && IsValidEntity(entity) )
-	{
-		static char classname[32];
-		GetEntityClassname(entity, classname, sizeof(classname));
-
-		int type;
-
-		if( strncmp(classname, "weapon_rifle_m60", 16) == 0 )				type = 17;
-		else if( strncmp(classname, "weapon_grenade_launcher", 23) == 0 )	type = 18;
-		else if( strncmp(classname, "weapon_chainsaw", 15) == 0 )			type = 19;
-
-		if( type )
-		{
-			entity = EntIndexToEntRef(entity);
-
-			for( int i = 0; i < MAX_SPAWNS; i++ )
-			{
-				if( g_iSpawns[i][0] == entity )
-				{
-					g_iSpawns[i][2]--;
-
-					if( g_iSpawns[i][2] > 0 )
-					{
-						float vAng[3], vPos[3];
-						GetEntPropVector(entity, Prop_Data, "m_vecOrigin", vPos);
-						GetEntPropVector(entity, Prop_Data, "m_angRotation", vAng);
-
-						int count = g_iSpawnCount; // Lazy hack
-						g_iSpawnCount = 0;
-
-						CreateSpawn(vPos, vAng, g_iSpawns[i][1], type, false, g_iSpawns[i][2]);
-
-						g_iSpawnCount = count;
-					}
-
-					break;
-				}
-			}
-		}
-	}
-}
-
 void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
 	ResetPlugin(false);
@@ -743,7 +417,7 @@ Action TimerStart(Handle timer)
 // ====================================================================================================
 void LoadSpawns()
 {
-	if( !g_bMapStarted || g_bLoaded || g_iCvarRandom == 0 ) return;
+	if( g_bLoaded || g_iCvarRandom == 0 ) return;
 	g_bLoaded = true;
 
 	char sPath[PLATFORM_MAX_PATH];
@@ -769,7 +443,7 @@ void LoadSpawns()
 		return;
 	}
 
-	// Retrieve how many weapons to display
+	// Retrieve how many Melees to display
 	int iCount = hFile.GetNum("num", 0);
 	if( iCount == 0 )
 	{
@@ -777,13 +451,13 @@ void LoadSpawns()
 		return;
 	}
 
-	// Spawn only a select few weapons?
+	// Spawn only a select few Melees?
 	int iIndexes[MAX_SPAWNS+1];
 	if( iCount > MAX_SPAWNS )
 		iCount = MAX_SPAWNS;
 
 
-	// Spawn saved weapons or create random
+	// Spawn saved Melees or create random
 	int iRandom = g_iCvarRandom;
 	if( iRandom == -1 || iRandom > iCount)
 		iRandom = iCount;
@@ -796,7 +470,7 @@ void LoadSpawns()
 		iCount = iRandom;
 	}
 
-	// Get the weapon origins and spawn
+	// Get the Melee origins and spawn
 	char sTemp[4];
 	float vPos[3], vAng[3];
 	int index, iMod;
@@ -818,8 +492,6 @@ void LoadSpawns()
 			else
 				CreateSpawn(vPos, vAng, index, iMod, true);
 			hFile.GoBack();
-		} else {
-			LogError("Error: missing index detected: \"%d\" from \"%s\" in \"%s\"", index, sMap, CONFIG_SPAWNS);
 		}
 	}
 
@@ -831,7 +503,7 @@ void LoadSpawns()
 // ====================================================================================================
 //					CREATE SPAWN
 // ====================================================================================================
-void CreateSpawn(const float vOrigin[3], const float vAngles[3], int index = 0, int model = 0, int autospawn = false, int respawn_count = -1)
+void CreateSpawn(const float vOrigin[3], const float vAngles[3], int index = 0, int model = 0, int autospawn = false)
 {
 	if( g_iSpawnCount >= MAX_SPAWNS )
 		return;
@@ -839,7 +511,7 @@ void CreateSpawn(const float vOrigin[3], const float vAngles[3], int index = 0, 
 	int iSpawnIndex = -1;
 	for( int i = 0; i < MAX_SPAWNS; i++ )
 	{
-		if( !IsValidEntRef(g_iSpawns[i][0]) )
+		if( g_iSpawns[i][0] == 0 )
 		{
 			iSpawnIndex = i;
 			break;
@@ -850,119 +522,38 @@ void CreateSpawn(const float vOrigin[3], const float vAngles[3], int index = 0, 
 		return;
 
 
-	if( autospawn && g_iCvarRandomise && GetRandomInt(0, 100) <= g_iCvarRandomise )
-	{
-		if( g_bLeft4Dead2 )
-		{
-			model = GetRandomInt(0, MAX_WEAPONS2-1);
-
-			// if( model == 15 || model == 18 )		model = GetRandomInt(0, 14);
-			// else if( model == 19 || model == 21 )	model = GetRandomInt(22, 28);
-		} else {
-			model = GetRandomInt(0, MAX_WEAPONS-1);
-		}
-	}
-
-	char classname[64];
-	strcopy(classname, sizeof(classname), g_bLeft4Dead2 ? g_sWeapons2[model] : g_sWeapons[model]);
-
-	int iCount = g_iCvarCount;
-	if( iCount != 1 )
-	{
-		StrCat(classname, sizeof(classname), "_spawn");
-	}
-
 	int entity_weapon = -1;
-	entity_weapon = CreateEntityByName(classname);
+	entity_weapon = CreateEntityByName("weapon_melee");
 	if( entity_weapon == -1 )
-		ThrowError("Failed to create entity '%s'", classname);
+		ThrowError("Failed to create entity 'weapon_melee'.");
+
+	if( autospawn && g_iCvarRandomise && GetRandomInt(0, 100) <= g_iCvarRandomise )
+		model = GetRandomInt(0, MAX_MELEE-1);
 
 	DispatchKeyValue(entity_weapon, "solid", "6");
-	DispatchKeyValue(entity_weapon, "model", g_bLeft4Dead2 ? g_sWeaponModels2[model] : g_sWeaponModels[model]);
-	DispatchKeyValue(entity_weapon, "rendermode", "3");
-	DispatchKeyValue(entity_weapon, "disableshadows", "1");
-
-	if( iCount <= 0 ) // Infinite
-	{
-		DispatchKeyValue(entity_weapon, "spawnflags", "8");
-		DispatchKeyValue(entity_weapon, "count", "9999");
-	}
-	else if( iCount != 1 )
-	{
-		char sCount[5];
-		IntToString(iCount, sCount, sizeof(sCount));
-		DispatchKeyValue(entity_weapon, "count", sCount);
-	}
-
-	float vAng[3], vPos[3];
-	vPos = vOrigin;
-	vAng = vAngles;
-	if( model == (g_bLeft4Dead2 ? 25 : 8) ) // First aid
-	{
-		vAng[0] += 90.0;
-		vPos[2] += 1.0;
-	}
-	else if( g_bLeft4Dead2 && model == 24 ) // Adrenaline
-	{
-		vAng[1] -= 90.0;
-		vAng[2] -= 90.0;
-		vPos[2] += 1.0;
-	}
-	else if( g_bLeft4Dead2 && (model == 26 || model == 27 || model == 28 )) // Defib + Upgrades
-	{
-		vAng[1] -= 90.0;
-		vAng[2] += 90.0;
-	}
-	else if( g_bLeft4Dead2 && model == 19 ) // Chainsaw
-	{
-		vPos[2] += 3.0;
-	}
-
-	TeleportEntity(entity_weapon, vPos, vAng, NULL_VECTOR);
+	DispatchKeyValue(entity_weapon, "melee_script_name", g_sScripts[model]);
 	DispatchSpawn(entity_weapon);
 
-	if( iCount == 1 )
+	if( model == 4 || model == 6 )
 	{
-		int ammo;
-
-		if( g_bLeft4Dead2 )
+		if( model == 4 )
 		{
-			switch( model )
-			{
-				case 10, 11, 12:		ammo = g_iAmmoSmg;
-				case 2, 3, 4, 5:		ammo = g_iAmmoRifle;
-				case 8, 9:				ammo = g_iAmmoShotgun;
-				case 6, 7:				ammo = g_iAmmoAutoShot;
-				case 19:				ammo = g_iAmmoChainsaw;
-				case 17:				ammo = g_iAmmoM60;
-				case 18:				ammo = g_iAmmoGL;
-				case 13, 14, 15, 16:	ammo = g_iAmmoSniper;
-			}
+			float vPos[3];
+			vPos = vOrigin;
+			vPos[2] += 0.6;
+			TeleportEntity(entity_weapon, vPos, vAngles, NULL_VECTOR);
 		} else {
-			switch( model )
-			{
-				case 0:						ammo = g_iAmmoRifle;
-				case 1:						ammo = g_iAmmoAutoShot;
-				case 2:						ammo = g_iAmmoHunting;
-				case 3:						ammo = g_iAmmoSmg;
-				case 4:						ammo = g_iAmmoShotgun;
-			}
+			float vAng[3];
+			vAng = vAngles;
+			vAng[0] += 180.0;
+			vAng[1] += 180.0;
+			TeleportEntity(entity_weapon, vOrigin, vAng, NULL_VECTOR);
 		}
-
-		if( !g_bLeft4Dead2 && model == 1 ) ammo = g_iAmmoShotgun;
-
-		SetEntProp(entity_weapon, Prop_Send, "m_iExtraPrimaryAmmo", ammo, 4);
+	} else {
+		TeleportEntity(entity_weapon, vOrigin, vAngles, NULL_VECTOR);
 	}
+
 	SetEntityMoveType(entity_weapon, MOVETYPE_NONE);
-
-	// Save M60, Grenade Launcher and Chainsaw spawn counts
-	if( g_bLeft4Dead2 && iCount != 1 && (model == 17 || model == 18 || model == 19) )
-	{
-		if( iCount == 0 )
-			g_iSpawns[iSpawnIndex][2] = 999;
-		else
-			g_iSpawns[iSpawnIndex][2] = respawn_count != -1 ? respawn_count : iCount;
-	}
 
 	g_iSpawns[iSpawnIndex][0] = EntIndexToEntRef(entity_weapon);
 	g_iSpawns[iSpawnIndex][1] = index;
@@ -975,7 +566,7 @@ void CreateSpawn(const float vOrigin[3], const float vAngles[3], int index = 0, 
 // ====================================================================================================
 //					COMMANDS
 // ====================================================================================================
-//					sm_weapon_spawn
+//					sm_melee_spawn
 // ====================================================================================================
 int ListMenuHandler(Menu menu, MenuAction action, int client, int index)
 {
@@ -998,12 +589,12 @@ Action CmdSpawnerTemp(int client, int args)
 {
 	if( !client )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
+		ReplyToCommand(client, "[Melee Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
 		return Plugin_Handled;
 	}
 	else if( g_iSpawnCount >= MAX_SPAWNS )
 	{
-		PrintToChat(client, "%sError: Cannot add anymore weapons. Used: (\x05%d/%d\x01).", CHAT_TAG, g_iSpawnCount, MAX_SPAWNS);
+		PrintToChat(client, "%sError: Cannot add anymore Melees. Used: (\x05%d/%d\x01).", CHAT_TAG, g_iSpawnCount, MAX_SPAWNS);
 		return Plugin_Handled;
 	}
 
@@ -1017,19 +608,19 @@ void CmdSpawnerTempMenu(int client, int weapon)
 {
 	if( !client )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
+		ReplyToCommand(client, "[Melee Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
 		return;
 	}
 	else if( g_iSpawnCount >= MAX_SPAWNS )
 	{
-		PrintToChat(client, "%sError: Cannot add anymore weapons. Used: (\x05%d/%d\x01).", CHAT_TAG, g_iSpawnCount, MAX_SPAWNS);
+		PrintToChat(client, "%sError: Cannot add anymore Melees. Used: (\x05%d/%d\x01).", CHAT_TAG, g_iSpawnCount, MAX_SPAWNS);
 		return;
 	}
 
 	float vPos[3], vAng[3];
 	if( !SetTeleportEndPoint(client, vPos, vAng) )
 	{
-		PrintToChat(client, "%sCannot place weapon, please try again.", CHAT_TAG);
+		PrintToChat(client, "%sCannot place Melee, please try again.", CHAT_TAG);
 		return;
 	}
 
@@ -1038,18 +629,18 @@ void CmdSpawnerTempMenu(int client, int weapon)
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_save
+//					sm_melee_spawn_save
 // ====================================================================================================
 Action CmdSpawnerSave(int client, int args)
 {
 	if( !client )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
+		ReplyToCommand(client, "[Melee Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
 		return Plugin_Handled;
 	}
 	else if( g_iSpawnCount >= MAX_SPAWNS )
 	{
-		PrintToChat(client, "%sError: Cannot add anymore weapons. Used: (\x05%d/%d\x01).", CHAT_TAG, g_iSpawnCount, MAX_SPAWNS);
+		PrintToChat(client, "%sError: Cannot add anymore Melees. Used: (\x05%d/%d\x01).", CHAT_TAG, g_iSpawnCount, MAX_SPAWNS);
 		return Plugin_Handled;
 	}
 
@@ -1061,12 +652,10 @@ Action CmdSpawnerSave(int client, int args)
 
 void CmdSpawnerSaveMenu(int client, int weapon)
 {
-	bool isNew;
 	char sPath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_SPAWNS);
 	if( !FileExists(sPath) )
 	{
-		isNew = true;
 		File hCfg = OpenFile(sPath, "w");
 		hCfg.WriteLine("");
 		delete hCfg;
@@ -1076,13 +665,7 @@ void CmdSpawnerSaveMenu(int client, int weapon)
 	KeyValues hFile = new KeyValues("spawns");
 	if( !hFile.ImportFromFile(sPath) )
 	{
-		isNew = true;
-		PrintToChat(client, "%sError: Cannot read the weapon config, assuming empty file. (\x05%s\x01).", CHAT_TAG, sPath);
-	}
-
-	if( isNew )
-	{
-		hFile.SetNum("version", 2);
+		PrintToChat(client, "%sError: Cannot read the Melee Spawn config, assuming empty file. (\x05%s\x01).", CHAT_TAG, sPath);
 	}
 
 	// Check for current map in the config
@@ -1090,16 +673,16 @@ void CmdSpawnerSaveMenu(int client, int weapon)
 	GetCurrentMap(sMap, sizeof(sMap));
 	if( !hFile.JumpToKey(sMap, true) )
 	{
-		PrintToChat(client, "%sError: Failed to add map to weapon spawn config.", CHAT_TAG);
+		PrintToChat(client, "%sError: Failed to add map to Melee Spawn config.", CHAT_TAG);
 		delete hFile;
 		return;
 	}
 
-	// Retrieve how many weapons are saved
+	// Retrieve how many Melee Spawns are saved
 	int iCount = hFile.GetNum("num", 0);
 	if( iCount >= MAX_SPAWNS )
 	{
-		PrintToChat(client, "%sError: Cannot add anymore weapons. Used: (\x05%d/%d\x01).", CHAT_TAG, iCount, MAX_SPAWNS);
+		PrintToChat(client, "%sError: Cannot add anymore Melee Spawns. Used: (\x05%d/%d\x01).", CHAT_TAG, iCount, MAX_SPAWNS);
 		delete hFile;
 		return;
 	}
@@ -1113,11 +696,11 @@ void CmdSpawnerSaveMenu(int client, int weapon)
 
 	if( hFile.JumpToKey(sTemp, true) )
 	{
-		// Set player position as weapon spawn location
+		// Set player position as Melee Spawn location
 		float vPos[3], vAng[3];
 		if( !SetTeleportEndPoint(client, vPos, vAng) )
 		{
-			PrintToChat(client, "%sCannot place weapon, please try again.", CHAT_TAG);
+			PrintToChat(client, "%sCannot place Melee Spawn, please try again.", CHAT_TAG);
 			delete hFile;
 			return;
 		}
@@ -1136,25 +719,25 @@ void CmdSpawnerSaveMenu(int client, int weapon)
 		PrintToChat(client, "%s(\x05%d/%d\x01) - Saved at pos:[\x05%f %f %f\x01] ang:[\x05%f %f %f\x01]", CHAT_TAG, iCount, MAX_SPAWNS, vPos[0], vPos[1], vPos[2], vAng[0], vAng[1], vAng[2]);
 	}
 	else
-		PrintToChat(client, "%s(\x05%d/%d\x01) - Failed to save weapon.", CHAT_TAG, iCount, MAX_SPAWNS);
+		PrintToChat(client, "%s(\x05%d/%d\x01) - Failed to save Melee Spawn.", CHAT_TAG, iCount, MAX_SPAWNS);
 
 	delete hFile;
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_del
+//					sm_melee_spawn_del
 // ====================================================================================================
 Action CmdSpawnerDel(int client, int args)
 {
 	if( !g_bCvarAllow )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Plugin turned off.");
+		ReplyToCommand(client, "[Melee Spawn] Plugin turned off.");
 		return Plugin_Handled;
 	}
 
 	if( !client )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
+		ReplyToCommand(client, "[Melee Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
 		return Plugin_Handled;
 	}
 
@@ -1195,14 +778,14 @@ Action CmdSpawnerDel(int client, int args)
 	BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_SPAWNS);
 	if( !FileExists(sPath) )
 	{
-		PrintToChat(client, "%sError: Cannot find the weapon config (\x05%s\x01).", CHAT_TAG, CONFIG_SPAWNS);
+		PrintToChat(client, "%sError: Cannot find the Melee Spawn config (\x05%s\x01).", CHAT_TAG, CONFIG_SPAWNS);
 		return Plugin_Handled;
 	}
 
 	KeyValues hFile = new KeyValues("spawns");
 	if( !hFile.ImportFromFile(sPath) )
 	{
-		PrintToChat(client, "%sError: Cannot load the weapon config (\x05%s\x01).", CHAT_TAG, sPath);
+		PrintToChat(client, "%sError: Cannot load the Melee Spawn config (\x05%s\x01).", CHAT_TAG, sPath);
 		delete hFile;
 		return Plugin_Handled;
 	}
@@ -1213,12 +796,12 @@ Action CmdSpawnerDel(int client, int args)
 
 	if( !hFile.JumpToKey(sMap) )
 	{
-		PrintToChat(client, "%sError: Current map not in the weapon config.", CHAT_TAG);
+		PrintToChat(client, "%sError: Current map not in the Melee Spawn config.", CHAT_TAG);
 		delete hFile;
 		return Plugin_Handled;
 	}
 
-	// Retrieve how many weapons
+	// Retrieve how many Melee Spawns
 	int iCount = hFile.GetNum("num", 0);
 	if( iCount == 0 )
 	{
@@ -1262,40 +845,40 @@ Action CmdSpawnerDel(int client, int args)
 		hFile.Rewind();
 		hFile.ExportToFile(sPath);
 
-		PrintToChat(client, "%s(\x05%d/%d\x01) - weapon removed from config.", CHAT_TAG, iCount, MAX_SPAWNS);
+		PrintToChat(client, "%s(\x05%d/%d\x01) - Melee Spawn removed from config.", CHAT_TAG, iCount, MAX_SPAWNS);
 	}
 	else
-		PrintToChat(client, "%s(\x05%d/%d\x01) - Failed to remove weapon from config.", CHAT_TAG, iCount, MAX_SPAWNS);
+		PrintToChat(client, "%s(\x05%d/%d\x01) - Failed to remove Melee Spawn from config.", CHAT_TAG, iCount, MAX_SPAWNS);
 
 	delete hFile;
 	return Plugin_Handled;
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_clear
+//					sm_melee_spawn_clear
 // ====================================================================================================
 Action CmdSpawnerClear(int client, int args)
 {
 	if( !client )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
+		ReplyToCommand(client, "[Melee Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
 		return Plugin_Handled;
 	}
 
 	ResetPlugin();
 
-	PrintToChat(client, "%s(0/%d) - All weapons removed from the map.", CHAT_TAG, MAX_SPAWNS);
+	PrintToChat(client, "%s(0/%d) - All Melee Spawns removed from the map.", CHAT_TAG, MAX_SPAWNS);
 	return Plugin_Handled;
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_wipe
+//					sm_melee_spawn_wipe
 // ====================================================================================================
 Action CmdSpawnerWipe(int client, int args)
 {
 	if( !client )
 	{
-		ReplyToCommand(client, "[Weapon Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
+		ReplyToCommand(client, "[Melee Spawn] Command can only be used %s", IsDedicatedServer() ? "in game on a dedicated server." : "in chat on a Listen server.");
 		return Plugin_Handled;
 	}
 
@@ -1303,7 +886,7 @@ Action CmdSpawnerWipe(int client, int args)
 	BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_SPAWNS);
 	if( !FileExists(sPath) )
 	{
-		PrintToChat(client, "%sError: Cannot find the weapon config (\x05%s\x01).", CHAT_TAG, sPath);
+		PrintToChat(client, "%sError: Cannot find the Melee Spawn config (\x05%s\x01).", CHAT_TAG, sPath);
 		return Plugin_Handled;
 	}
 
@@ -1311,7 +894,7 @@ Action CmdSpawnerWipe(int client, int args)
 	KeyValues hFile = new KeyValues("spawns");
 	if( !hFile.ImportFromFile(sPath) )
 	{
-		PrintToChat(client, "%sError: Cannot load the weapon config (\x05%s\x01).", CHAT_TAG, sPath);
+		PrintToChat(client, "%sError: Cannot load the Melee Spawn config (\x05%s\x01).", CHAT_TAG, sPath);
 		delete hFile;
 		return Plugin_Handled;
 	}
@@ -1322,7 +905,7 @@ Action CmdSpawnerWipe(int client, int args)
 
 	if( !hFile.JumpToKey(sMap, false) )
 	{
-		PrintToChat(client, "%sError: Current map not in the weapon config.", CHAT_TAG);
+		PrintToChat(client, "%sError: Current map not in the Melee Spawn config.", CHAT_TAG);
 		delete hFile;
 		return Plugin_Handled;
 	}
@@ -1335,12 +918,12 @@ Action CmdSpawnerWipe(int client, int args)
 	hFile.ExportToFile(sPath);
 	delete hFile;
 
-	PrintToChat(client, "%s(0/%d) - All weapons removed from config, add with \x05sm_weapon_spawn_save\x01.", CHAT_TAG, MAX_SPAWNS);
+	PrintToChat(client, "%s(0/%d) - All Melee Spawns removed from config, add with \x05sm_melee_spawn_save\x01.", CHAT_TAG, MAX_SPAWNS);
 	return Plugin_Handled;
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_glow
+//					sm_melee_spawn_glow
 // ====================================================================================================
 Action CmdSpawnerGlow(int client, int args)
 {
@@ -1364,15 +947,15 @@ void VendorGlow(int glow)
 			SetEntProp(ent, Prop_Send, "m_iGlowType", glow ? 3 : 0);
 			if( glow )
 			{
-				SetEntProp(ent, Prop_Send, "m_glowColorOverride", g_iCvarGlowCol);
-				SetEntProp(ent, Prop_Send, "m_nGlowRange", glow ? 0 : g_iCvarGlow);
+				SetEntProp(ent, Prop_Send, "m_glowColorOverride", 255);
+				SetEntProp(ent, Prop_Send, "m_nGlowRange", glow ? 0 : 50);
 			}
 		}
 	}
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_list
+//					sm_melee_spawn_list
 // ====================================================================================================
 Action CmdSpawnerList(int client, int args)
 {
@@ -1392,7 +975,7 @@ Action CmdSpawnerList(int client, int args)
 }
 
 // ====================================================================================================
-//					sm_weapon_spawn_tele
+//					sm_melee_spawn_tele
 // ====================================================================================================
 Action CmdSpawnerTele(int client, int args)
 {
@@ -1414,7 +997,7 @@ Action CmdSpawnerTele(int client, int args)
 		PrintToChat(client, "%sCould not find index for teleportation.", CHAT_TAG);
 	}
 	else
-		PrintToChat(client, "%sUsage: sm_weapon_spawn_tele <index 1-%d>.", CHAT_TAG, MAX_SPAWNS);
+		PrintToChat(client, "%sUsage: sm_melee_spawn_tele <index 1-%d>.", CHAT_TAG, MAX_SPAWNS);
 	return Plugin_Handled;
 }
 
@@ -1483,59 +1066,6 @@ void SetAngle(int client, int index)
 	}
 }
 
-Action CmdSpawnerRot(int client, int args)
-{
-	if( args < 2 )
-	{
-		PrintToChat(client, "[SM] Usage: sm_weapon_spawn_rot {x|y|z} {degree}");
-		return Plugin_Handled;
-	}
-
-	int aim = GetClientAimTarget(client, false);
-	if( aim != -1 )
-	{
-		char arg1[16], arg2[16];
-		GetCmdArg(1, arg1, sizeof(arg1));
-		GetCmdArg(2, arg2, sizeof(arg2));
-		int iAngles = StringToInt(arg2);
-
-		float vAng[3];
-		int entity;
-		aim = EntIndexToEntRef(aim);
-
-		for( int i = 0; i < MAX_SPAWNS; i++ )
-		{
-			entity = g_iSpawns[i][0];
-
-			if( entity == aim  )
-			{
-				GetEntPropVector(entity, Prop_Send, "m_angRotation", vAng);
-				//x:vAng[0],y:vAng[1],z:vAng[2]
-				if( strcmp(arg1, "x") == 0 )
-				{
-					vAng[0] += iAngles;
-				}
-				else if( strcmp(arg1, "y") == 0 )
-				{
-					vAng[1] += iAngles;
-				}
-				else if( strcmp(arg1, "z") == 0 )
-				{
-					vAng[2] += iAngles;
-				}
-				else
-				{
-					PrintToChat(client, "[SM] Axis not in [x|y|z]");
-				}
-
-				TeleportEntity(entity, NULL_VECTOR, vAng, NULL_VECTOR);
-				break;
-			}
-		}
-	}
-	return Plugin_Handled;
-}
-
 // ====================================================================================================
 //					MENU ORIGIN
 // ====================================================================================================
@@ -1601,61 +1131,6 @@ void SetOrigin(int client, int index)
 	}
 }
 
-Action CmdSpawnerMov(int client, int args)
-{
-	if( args < 2 )
-	{
-		PrintToChat(client, "[SM] Usage: sm_weapon_spawn_mov {x|y|z} {distance}");
-		
-		return Plugin_Handled;
-	}
-
-	int aim = GetClientAimTarget(client, false);
-	if( aim != -1 )
-	{
-		char arg1[16], arg2[16];
-		GetCmdArg(1, arg1, sizeof(arg1));
-		GetCmdArg(2, arg2, sizeof(arg2));
-
-		float vPos[3];
-		int entity;
-		aim = EntIndexToEntRef(aim);
-
-		for( int i = 0; i < MAX_SPAWNS; i++ )
-		{
-			entity = g_iSpawns[i][0];
-
-			if( entity == aim  )
-			{
-				GetEntPropVector(entity, Prop_Send, "m_vecOrigin", vPos);
-
-				float flPosition = StringToFloat(arg2);
-				if( strcmp(arg1, "x") == 0 )
-				{
-					vPos[0] += flPosition;
-				}
-				else if( strcmp(arg1, "y") == 0 )
-				{
-					vPos[1] += flPosition;
-				}
-				else if( strcmp(arg1, "z") == 0 )
-				{
-					vPos[2] += flPosition;
-				}
-				else
-				{
-					PrintToChat(client, "[SM] Axis not in [x|y|z]");
-				}
-
-				TeleportEntity(entity, vPos, NULL_VECTOR, NULL_VECTOR);
-
-				break;
-			}
-		}
-	}
-	return Plugin_Handled;
-}
-
 void SaveData(int client)
 {
 	int entity, index;
@@ -1684,14 +1159,14 @@ void SaveData(int client)
 	BuildPath(Path_SM, sPath, sizeof(sPath), CONFIG_SPAWNS);
 	if( !FileExists(sPath) )
 	{
-		PrintToChat(client, "%sError: Cannot find the Weapon Spawn config (\x05%s\x01).", CHAT_TAG, CONFIG_SPAWNS);
+		PrintToChat(client, "%sError: Cannot find the Melee Spawn config (\x05%s\x01).", CHAT_TAG, CONFIG_SPAWNS);
 		return;
 	}
 
 	KeyValues hFile = new KeyValues("spawns");
 	if( !hFile.ImportFromFile(sPath) )
 	{
-		PrintToChat(client, "%sError: Cannot load the Weapon Spawn config (\x05%s\x01).", CHAT_TAG, sPath);
+		PrintToChat(client, "%sError: Cannot load the Melee Spawn config (\x05%s\x01).", CHAT_TAG, sPath);
 		delete hFile;
 		return;
 	}
@@ -1702,7 +1177,7 @@ void SaveData(int client)
 
 	if( !hFile.JumpToKey(sMap) )
 	{
-		PrintToChat(client, "%sError: Current map not in the Weapon Spawn config.", CHAT_TAG);
+		PrintToChat(client, "%sError: Current map not in the Melee Spawn config.", CHAT_TAG);
 		delete hFile;
 		return;
 	}
@@ -1830,10 +1305,13 @@ bool SetTeleportEndPoint(int client, float vPos[3], float vAng[3])
 		float vNorm[3];
 		float degrees = vAng[1];
 		TR_GetEndPosition(vPos, trace);
+
 		GetGroundHeight(vPos);
 		vPos[2] += 1.0;
+
 		TR_GetPlaneNormal(trace, vNorm);
 		GetVectorAngles(vNorm, vAng);
+
 		if( vNorm[2] == 1.0 )
 		{
 			vAng[0] = 0.0;
@@ -1874,10 +1352,10 @@ bool _TraceFilter(int entity, int contentsMask)
 void RotateYaw(float angles[3], float degree)
 {
 	float direction[3], normal[3];
-	GetAngleVectors( angles, direction, NULL_VECTOR, normal );
+	GetAngleVectors(angles, direction, NULL_VECTOR, normal);
 
-	float sin = Sine( degree * 0.01745328 );	 // Pi/180
-	float cos = Cosine( degree * 0.01745328 );
+	float sin = Sine(degree * 0.01745328);	 // Pi/180
+	float cos = Cosine(degree * 0.01745328);
 	float a = normal[0] * sin;
 	float b = normal[1] * sin;
 	float c = normal[2] * sin;
@@ -1888,12 +1366,12 @@ void RotateYaw(float angles[3], float degree)
 	direction[1] = y;
 	direction[2] = z;
 
-	GetVectorAngles( direction, angles );
+	GetVectorAngles(direction, angles);
 
 	float up[3];
-	GetVectorVectors( direction, NULL_VECTOR, up );
+	GetVectorVectors(direction, NULL_VECTOR, up);
 
-	float roll = GetAngleBetweenVectors( up, normal, direction );
+	float roll = GetAngleBetweenVectors(up, normal, direction);
 	angles[2] += roll;
 }
 
@@ -1905,11 +1383,11 @@ void RotateYaw(float angles[3], float degree)
 float GetAngleBetweenVectors(const float vector1[3], const float vector2[3], const float direction[3])
 {
 	float vector1_n[3], vector2_n[3], direction_n[3], cross[3];
-	NormalizeVector( direction, direction_n );
-	NormalizeVector( vector1, vector1_n );
-	NormalizeVector( vector2, vector2_n );
-	float degree = ArcCosine( GetVectorDotProduct( vector1_n, vector2_n ) ) * 57.29577951;   // 180/Pi
-	GetVectorCrossProduct( vector1_n, vector2_n, cross );
+	NormalizeVector(direction, direction_n);
+	NormalizeVector(vector1, vector1_n);
+	NormalizeVector(vector2, vector2_n);
+	float degree = ArcCosine(GetVectorDotProduct(vector1_n, vector2_n )) * 57.29577951;   // 180/Pi
+	GetVectorCrossProduct(vector1_n, vector2_n, cross);
 
 	if( GetVectorDotProduct( cross, direction_n ) < 0.0 )
 		degree *= -1.0;

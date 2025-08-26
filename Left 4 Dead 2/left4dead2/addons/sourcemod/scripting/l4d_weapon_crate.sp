@@ -288,6 +288,7 @@ public void OnPluginStart()
 	g_hCvarRandomise =	CreateConVar(	"l4d_weapon_crate_randomise",		"25",			"0=Off. Chance out of 100 to randomise the type of item/weapon regardless of what it's set to.", CVAR_FLAGS );
 	CreateConVar(						"l4d_weapon_crate_version",			PLUGIN_VERSION, "Weapon Crate plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	AutoExecConfig(true,				"l4d_weapon_crate");
+	SetRandomSeed(GetTime());
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
 	g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Allow);
@@ -609,7 +610,7 @@ void LoadSpawns()
 		for( int i = 1; i <= iCount; i++ )
 			iIndexes[i-1] = i;
 
-		SortIntegers(iIndexes, iCount, Sort_Random);
+		SortCustom(iIndexes, iCount, Sort_Random);
 		iCount = iRandom;
 	}
 
@@ -1751,4 +1752,20 @@ float GetAngleBetweenVectors(const float vector1[3], const float vector2[3], con
 		degree *= -1.0;
 
 	return degree;
+}
+
+
+void SortCustom(int [] arr, int count,  SortOrder ignored)
+{
+    if( ignored != Sort_Random ) return; // To ignore 
+
+    int x, temp;
+
+    for( int i = count - 1; i > 0; i-- )
+    {
+        x = RoundToFloor(GetRandomFloat(0.0, 1.0) * (i + 1));
+        temp = arr[i];
+        arr[i] = arr[x];
+        arr[x] = temp;
+    }
 }
