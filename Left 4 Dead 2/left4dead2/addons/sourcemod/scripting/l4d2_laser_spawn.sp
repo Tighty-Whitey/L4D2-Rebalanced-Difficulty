@@ -1,6 +1,6 @@
 /*
 *	[L4D2] Laser Box Spawner
-*	Copyright (C) 2022 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.5"
+#define PLUGIN_VERSION 		"1.6"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.6 (30-Aug-2025)
+	- Replaced "SortIntegers" and "Sort_Random" with "SortCustom" to truly randomize spawn selection. Thanks to "Tighty-Whitey" for reporting.
 
 1.5 (11-Dec-2022)
 	- Changes to fix compile warnings on SourceMod 1.11.
@@ -108,6 +111,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
+	SetRandomSeed(GetTime());
+
 	g_hCvarAllow =		CreateConVar(	"l4d2_laser_spawn_allow",		"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
 	g_hCvarModes =		CreateConVar(	"l4d2_laser_spawn_modes",		"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
 	g_hCvarModesOff =	CreateConVar(	"l4d2_laser_spawn_modes_off",	"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
@@ -115,7 +120,6 @@ public void OnPluginStart()
 	g_hCvarRandom =		CreateConVar(	"l4d2_laser_spawn_random",		"-1",			"-1=All, 0=None. Otherwise randomly select this many Laser Boxes to spawn from the maps config.", CVAR_FLAGS );
 	CreateConVar(						"l4d2_laser_spawn_version",		PLUGIN_VERSION, "Laser Spawner plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	AutoExecConfig(true,				"l4d2_laser_spawn");
-	SetRandomSeed(GetTime());
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
 	g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Allow);
@@ -361,7 +365,7 @@ void LoadSpawns()
 		for( int i = 1; i <= iCount; i++ )
 			iIndexes[i-1] = i;
 
-		SortCustom(iIndexes, iCount, Sort_Random);
+		SortCustom(iIndexes, iCount);
 		iCount = iRandom;
 	}
 
@@ -1087,6 +1091,19 @@ void RemoveSpawn(int index)
 		RemoveEntity(entity);
 }
 
+void SortCustom(int [] arr, int count)
+{
+	int x, temp;
+
+	for( int i = count - 1; i > 0; i-- )
+	{
+		x = RoundToFloor(GetRandomFloat(0.0, 1.0) * (i + 1));
+		temp = arr[i];
+		arr[i] = arr[x];
+		arr[x] = temp;
+	}
+}
+
 
 
 // ====================================================================================================
@@ -1131,20 +1148,4 @@ bool SetTeleportEndPoint(int client, float vPos[3], float vAng[3])
 bool _TraceFilter(int entity, int contentsMask)
 {
 	return entity > MaxClients || !entity;
-}
-
-
-void SortCustom(int [] arr, int count,  SortOrder ignored)
-{
-    if( ignored != Sort_Random ) return; // To ignore 
-
-    int x, temp;
-
-    for( int i = count - 1; i > 0; i-- )
-    {
-        x = RoundToFloor(GetRandomFloat(0.0, 1.0) * (i + 1));
-        temp = arr[i];
-        arr[i] = arr[x];
-        arr[x] = temp;
-    }
 }
