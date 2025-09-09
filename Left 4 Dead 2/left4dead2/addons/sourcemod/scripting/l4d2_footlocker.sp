@@ -1,6 +1,6 @@
 /*
 *	Footlocker Spawner
-*	Copyright (C) 2023 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.19"
+#define PLUGIN_VERSION 		"1.20"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.20 (30-Aug-2025)
+	- Replaced "SortIntegers" and "Sort_Random" with "SortCustom" to truly randomize spawn selection. Thanks to "Tighty-Whitey" for reporting.
 
 1.19 (22-Nov-2023)
 	- Changed to TeleportEntity before DispatchSpawn to prevent crashes. Thanks to "HarryPotter" for reporting.
@@ -238,6 +241,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
+	SetRandomSeed(GetTime());
+
 	g_hCvarAllow =		CreateConVar(	"l4d2_footlocker_allow",		"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS);
 	g_hCvarGlow =		CreateConVar(	"l4d2_footlocker_glow",			"100",			"0=Off. Any other value is the range at which the glow will turn on.", CVAR_FLAGS );
 	g_hCvarGlowCol =	CreateConVar(	"l4d2_footlocker_glow_color",	"0 255 0",		"0=Default glow color. Three values between 0-255 separated by spaces. RGB Color255 - Red Green Blue.", CVAR_FLAGS );
@@ -253,7 +258,6 @@ public void OnPluginStart()
 	g_hCvarWitch =		CreateConVar(	"l4d2_footlocker_witch",		"100",			"0=Off, 1/cvar value. The chance of a footlocker containing a witch.", CVAR_FLAGS );
 	CreateConVar(						"l4d2_footlocker_version",		PLUGIN_VERSION, "Footlocker plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	AutoExecConfig(true,				"l4d2_footlocker");
-	SetRandomSeed(GetTime());
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
 	g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Allow);
@@ -645,7 +649,7 @@ void LoadFootlockers()
 			for( i = 0; i < iCount; i++ )
 				iIndexes[i] = i+1;
 
-			SortCustom(iIndexes, iCount, Sort_Random);
+			SortCustom(iIndexes, iCount);
 			iCount = iRandom;
 		}
 	}
@@ -2211,6 +2215,19 @@ void RemoveLocker(int index)
 	g_iWitch[index] = 0;
 }
 
+void SortCustom(int [] arr, int count)
+{
+	int x, temp;
+
+	for( int i = count - 1; i > 0; i-- )
+	{
+		x = RoundToFloor(GetRandomFloat(0.0, 1.0) * (i + 1));
+		temp = arr[i];
+		arr[i] = arr[x];
+		arr[x] = temp;
+	}
+}
+
 
 
 // ====================================================================================================
@@ -2331,20 +2348,4 @@ float GetAngleBetweenVectors(const float vector1[3], const float vector2[3], con
 		degree *= -1.0;
 
 	return degree;
-}
-
-
-void SortCustom(int [] arr, int count,  SortOrder ignored)
-{
-    if( ignored != Sort_Random ) return; // To ignore 
-
-    int x, temp;
-
-    for( int i = count - 1; i > 0; i-- )
-    {
-        x = RoundToFloor(GetRandomFloat(0.0, 1.0) * (i + 1));
-        temp = arr[i];
-        arr[i] = arr[x];
-        arr[x] = temp;
-    }
 }
