@@ -1332,6 +1332,11 @@ bool SummonHordes(int horde_type)
 	if (horde_type == 1)
 	{
 		CheatCommand(client, "z_spawn", "mob");
+
+		// Compatibility: emit the stock panic-start event so event-based plugins (e.g. tint) trigger on z_spawn hordes too.
+		Event ev = CreateEvent("create_panic_event", true);
+		if (ev != null)
+			FireEvent(ev, true);
 		if (g_bPanicAmbEnable)
 		CreateTimer(5.0, T_PlayAmbientAfterPanic, _, TIMER_FLAG_NO_MAPCHANGE);
 		return true;
