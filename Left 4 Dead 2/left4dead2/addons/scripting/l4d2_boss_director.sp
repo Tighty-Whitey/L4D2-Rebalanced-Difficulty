@@ -45,7 +45,7 @@ public Plugin myinfo =
     name = "[L4D2] Boss Director",
     author = "Tighty-Whitey",
     description = "Adaptive boss director.",
-    version = "1.0",
+    version = "1.1",
     url = ""
 };
 
@@ -56,6 +56,7 @@ ConVar gC_Tick, gC_Debug, gC_MaxAlive, gC_NoBosses;
 // Score
 ConVar gC_StartEasy, gC_StartNorm, gC_StartAdv, gC_StartExp, gC_ScoreMin;
 ConVar gC_ResetScoreOnCampaign;
+ConVar gC_VersusBaseline, gC_VersusForceReset;
 
 // Damage -> score
 ConVar gC_DmgMode, gC_DmgPerPt, gC_DmgMul;
@@ -559,13 +560,22 @@ static void UpdateFinaleState()
     if (StrContains(lower, "_final", false) != -1) { g_IsFinale = true; return; }
     if (StrContains(lower, "_end",   false) != -1) { g_IsFinale = true; return; }
 
-    // Keep your “m5” pattern as last fallback
+    // Keep “m5” pattern as last fallback
     int len = strlen(lower);
     for (int i=0; i+1 < len; i++)
         if (lower[i] == 'm' && lower[i+1] == '5') { g_IsFinale = true; return; }
 }
 
 /* ===== Score init ===== */
+
+static bool BDIsVersusMode()
+{
+    if (gC_MPGameMode == null) return false;
+    char mode[64];
+    gC_MPGameMode.GetString(mode, sizeof mode);
+    return (StrContains(mode, "versus", false) != -1) || (StrContains(mode, "scavenge", false) != -1);
+}
+
 static void InitOrPersistScoreForCampaign()
 {
     char mapname[64];
@@ -585,26 +595,34 @@ static void InitOrPersistScoreForCampaign()
     if (!campaign[0]) strcopy(campaign, sizeof campaign, mapname);
     bool firstLoad = (g_LastCampaign[0] == '\0');
     bool changed = !firstLoad && !StrEqual(campaign, g_LastCampaign);
-    bool doReset = firstLoad || (changed && gC_ResetScoreOnCampaign.BoolValue);
+    bool doReset = (BDIsVersusMode() && gC_VersusForceReset.BoolValue) || firstLoad || (changed && gC_ResetScoreOnCampaign.BoolValue);
 
 // Drop P5 lock on first load/campaign change only if enabled
-if ((firstLoad || changed) && gC_P5UnlockOnCampaign.BoolValue)
+if ((BDIsVersusMode() && gC_VersusForceReset.BoolValue) || ((firstLoad || changed) && gC_P5UnlockOnCampaign.BoolValue))
 {
     g_Phase5Lock = false;
     g_LastPhase = PHASE_1;
     g_LockBaselineScore = 0.0;
 }
 if (doReset)
-{
-    char diff[32];
-    FindConVar("z_difficulty").GetString(diff, sizeof diff);
-    float startScore = gC_StartExp.FloatValue;
-    if (StrEqual(diff, "Easy", false)) startScore = gC_StartEasy.FloatValue;
-    else if (StrEqual(diff, "Normal", false)) startScore = gC_StartNorm.FloatValue;
-    else if (StrEqual(diff, "Advanced", false)) startScore = gC_StartAdv.FloatValue;
-    else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false)) startScore = gC_StartExp.FloatValue;
-    g_Score = startScore;
-}
+    {
+        float startScore = 0.0;
+        if (BDIsVersusMode())
+        {
+            startScore = gC_VersusBaseline.FloatValue;
+        }
+        else
+        {
+            char diff[32];
+            FindConVar("z_difficulty").GetString(diff, sizeof diff);
+            startScore = gC_StartExp.FloatValue;
+            if (StrEqual(diff, "Easy", false)) startScore = gC_StartEasy.FloatValue;
+            else if (StrEqual(diff, "Normal", false)) startScore = gC_StartNorm.FloatValue;
+            else if (StrEqual(diff, "Advanced", false)) startScore = gC_StartAdv.FloatValue;
+            else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false)) startScore = gC_StartExp.FloatValue;
+        }
+        g_Score = startScore;
+    }
 strcopy(g_LastCampaign, sizeof g_LastCampaign, campaign);
 float floorS = gC_ScoreMin.FloatValue;
 if (g_Score < floorS) g_Score = floorS;
@@ -617,15 +635,21 @@ g_TokensConsumed = 0;
 // HELPER FUNCTION
 static void ResetCycleToPhase1()
 {
-    char diff[32];
-    FindConVar("z_difficulty").GetString(diff, sizeof diff);
-    float startScore = gC_StartExp.FloatValue;
-    if      (StrEqual(diff, "Easy", false))      startScore = gC_StartEasy.FloatValue;
-    else if (StrEqual(diff, "Normal", false))    startScore = gC_StartNorm.FloatValue;
-    else if (StrEqual(diff, "Advanced", false))  startScore = gC_StartAdv.FloatValue;
-    else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false))
-        startScore = gC_StartExp.FloatValue;
-
+    float startScore = 0.0;
+    if (BDIsVersusMode())
+    {
+        startScore = gC_VersusBaseline.FloatValue;
+    }
+    else
+    {
+        char diff[32];
+        FindConVar("z_difficulty").GetString(diff, sizeof diff);
+        float startScore = gC_StartExp.FloatValue;
+        if (StrEqual(diff, "Easy", false)) startScore = gC_StartEasy.FloatValue;
+        else if (StrEqual(diff, "Normal", false)) startScore = gC_StartNorm.FloatValue;
+        else if (StrEqual(diff, "Advanced", false)) startScore = gC_StartAdv.FloatValue;
+        else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false)) startScore = gC_StartExp.FloatValue;
+    }
     g_Score = startScore;
     float floorS = gC_ScoreMin.FloatValue;
     if (g_Score < floorS) g_Score = floorS;
@@ -2360,10 +2384,12 @@ public void OnPluginStart()
     gC_Debug = CreateConVar(CVARNAME("_debug"), "0", "Debug logs (0/1)");
     gC_MaxAlive = CreateConVar(CVARNAME("_max_alive"), "4", "Max Tanks alive simultaneously");
 
-    gC_StartEasy = CreateConVar(CVARNAME("_score_start_easy"), "150", "Starting score on Easy");
-    gC_StartNorm = CreateConVar(CVARNAME("_score_start_normal"), "150", "Starting score on Normal");
-    gC_StartAdv = CreateConVar(CVARNAME("_score_start_advanced"), "180", "Starting score on Advanced");
+    gC_StartEasy = CreateConVar(CVARNAME("_score_start_easy"), "50", "Starting score on Easy");
+    gC_StartNorm = CreateConVar(CVARNAME("_score_start_normal"), "100", "Starting score on Normal");
+    gC_StartAdv = CreateConVar(CVARNAME("_score_start_advanced"), "150", "Starting score on Advanced");
     gC_StartExp = CreateConVar(CVARNAME("_score_start_expert"), "200", "Starting score on Expert");
+    gC_VersusBaseline = CreateConVar(CVARNAME("_versus_baseline_score"), "100", "Versus baseline starting score");
+    gC_VersusForceReset = CreateConVar(CVARNAME("_versus_force_baseline_reset"), "1", "In Versus, always reset score to versus baseline");
     gC_ScoreMin = CreateConVar(CVARNAME("_score_min"), "0", "Minimum score floor");
     gC_ResetScoreOnCampaign = CreateConVar(CVARNAME("_reset_score_on_campaign"), "1", "Reset score on campaign change");
 
