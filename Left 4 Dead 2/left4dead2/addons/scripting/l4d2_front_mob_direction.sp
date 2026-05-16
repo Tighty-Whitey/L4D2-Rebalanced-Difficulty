@@ -1,17 +1,13 @@
-// File: l4d2_front_mob_direction.sp
-
 #pragma semicolon 1
 #pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 
-// Left4DHooks natives (optional)
-native float L4D2_GetFurthestSurvivorFlow();
 native float L4D2Direct_GetFlowDistance(int client);
 native void  L4D2_ExecVScriptCode(const char[] code);
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.1"
 
 ConVar g_hCvarGap;
 ConVar g_hCvarInterval;
@@ -19,7 +15,7 @@ ConVar g_hCvarDebug;
 
 float g_fGap;
 float g_fInterval;
-bool  g_bDebug;
+int   g_iDebug;
 
 bool g_bApplied;
 bool g_bFight;
@@ -27,14 +23,15 @@ bool g_bFight;
 int  g_iOrigMobDir;
 bool g_bHaveOrigDir;
 
-ConVar g_hVSBuf;
-Handle g_hTimer;
+ConVar  g_hVSBuf;
+Handle  g_hTimer;
+
+char g_sLogPath[PLATFORM_MAX_PATH];
 
 public APLRes AskPluginLoad2(Handle self, bool late, char[] err, int errMax)
 {
 	RegPluginLibrary("l4d2_front_mob_direction");
 
-	MarkNativeAsOptional("L4D2_GetFurthestSurvivorFlow");
 	MarkNativeAsOptional("L4D2Direct_GetFlowDistance");
 	MarkNativeAsOptional("L4D2_ExecVScriptCode");
 
@@ -43,18 +40,18 @@ public APLRes AskPluginLoad2(Handle self, bool late, char[] err, int errMax)
 
 public Plugin myinfo =
 {
-	name = "[L4D2] Front Mob Direction",
-	author = "Tighty-Whitey",
-	description = "Forces mobs to spawn in front when survivor flow gap between players is large.",
-	version = "1.0",
-	url = ""
+	name        = "[L4D2] Front Mob Direction",
+	author      = "Tighty-Whitey",
+	description = "Forces mobs to spawn in front when survivor flow gap between alive players is large.",
+	version     = "1.1",
+	url         = ""
 };
 
 public void OnPluginStart()
 {
 	g_hCvarGap      = CreateConVar("l4d2_front_mob_gap", "2000", "Flow gap to force front mob direction.", FCVAR_NOTIFY);
 	g_hCvarInterval = CreateConVar("l4d2_front_mob_interval", "0.5", "Seconds between flow checks.", FCVAR_NOTIFY);
-	g_hCvarDebug    = CreateConVar("l4d2_front_mob_debug", "0", "Debug logging.", FCVAR_NONE);
+	g_hCvarDebug    = CreateConVar("l4d2_front_mob_debug", "0", "0=off, 1=state, 2=detailed tick state.", FCVAR_NONE);
 
 	AutoExecConfig(true, "l4d2_front_mob_direction");
 
@@ -64,29 +61,37 @@ public void OnPluginStart()
 
 	RefreshCvars();
 
+	BuildPath(Path_SM, g_sLogPath, sizeof(g_sLogPath), "logs/l4d2_front_mob_direction_debug.log");
+
 	g_hVSBuf = FindConVar("l4d2_vscript_return");
 	if (g_hVSBuf == null)
-	{
 		g_hVSBuf = CreateConVar("l4d2_vscript_return", "", "VScript return buffer. Do not use.", FCVAR_DONTRECORD);
-	}
 
 	HookEvent("player_left_safe_area", E_LeftSafe, EventHookMode_PostNoCopy);
-
-	HookEvent("round_end", E_RoundEnd, EventHookMode_PostNoCopy);
-	HookEvent("map_transition", E_RoundEnd, EventHookMode_PostNoCopy);
-	HookEvent("finale_vehicle_leaving", E_RoundEnd, EventHookMode_PostNoCopy);
-	HookEvent("mission_lost", E_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("round_end",            E_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("map_transition",       E_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("finale_vehicle_leaving",E_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("mission_lost",         E_RoundEnd, EventHookMode_PostNoCopy);
 }
 
 public void OnMapStart()
 {
 	ResetState();
+
+	char map[64];
+	GetCurrentMap(map, sizeof(map));
+	Dbg("OnMapStart map=%s", map);
+
 	CaptureOriginalDir();
 	StartThinkTimer();
 }
 
 public void OnMapEnd()
 {
+	char map[64];
+	GetCurrentMap(map, sizeof(map));
+	Dbg("OnMapEnd map=%s", map);
+
 	StopThinkTimer();
 
 	if (g_bApplied)
@@ -99,15 +104,6 @@ public void OnConfigsExecuted()
 {
 	RefreshCvars();
 	RestartThinkTimer();
-}
-
-void ResetState()
-{
-	g_bApplied = false;
-	g_bFight = false;
-
-	g_bHaveOrigDir = false;
-	g_iOrigMobDir = -1;
 }
 
 void OnCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -125,7 +121,18 @@ void RefreshCvars()
 		iv = 0.1;
 	g_fInterval = iv;
 
-	g_bDebug = g_hCvarDebug.BoolValue;
+	g_iDebug = g_hCvarDebug.IntValue;
+	if (g_iDebug < 0) g_iDebug = 0;
+	if (g_iDebug > 2) g_iDebug = 2;
+}
+
+void ResetState()
+{
+	g_bApplied = false;
+	g_bFight = false;
+
+	g_bHaveOrigDir = false;
+	g_iOrigMobDir = -1;
 }
 
 void StopThinkTimer()
@@ -156,9 +163,23 @@ public Action T_Think(Handle timer)
 	if (!g_bFight)
 		return Plugin_Continue;
 
-	float furthest = GetFurthestFlow();
-	float slowest  = GetSlowestFlow();
-	float gap      = furthest - slowest;
+	float furthest, slowest;
+	int alive = GetAliveSurvivorFlowMinMax(slowest, furthest);
+	float gap = furthest - slowest;
+
+	if (g_iDebug >= 2)
+	{
+		Dbg("Tick alive=%d slowest=%.1f furthest=%.1f gap=%.1f applied=%d",
+			alive, slowest, furthest, gap, g_bApplied ? 1 : 0);
+		LogAliveSurvivorFlows();
+	}
+
+	if (alive < 2)
+	{
+		if (g_bApplied)
+			RestoreOriginal();
+		return Plugin_Continue;
+	}
 
 	if (gap > g_fGap)
 	{
@@ -177,6 +198,7 @@ public Action T_Think(Handle timer)
 public void E_LeftSafe(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bFight = true;
+	Dbg("E_LeftSafe");
 
 	CaptureOriginalDir();
 	StartThinkTimer();
@@ -184,6 +206,8 @@ public void E_LeftSafe(Event event, const char[] name, bool dontBroadcast)
 
 public void E_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+	Dbg("E_RoundEnd");
+
 	g_bFight = false;
 
 	if (g_bApplied)
@@ -192,45 +216,51 @@ public void E_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 	StopThinkTimer();
 }
 
-float GetFurthestFlow()
+int GetAliveSurvivorFlowMinMax(float &minf, float &maxf)
 {
-	if (GetFeatureStatus(FeatureType_Native, "L4D2_GetFurthestSurvivorFlow") == FeatureStatus_Available)
-		return L4D2_GetFurthestSurvivorFlow();
+	minf = 0.0;
+	maxf = 0.0;
 
-	float maxf = 0.0;
+	bool any = false;
+	int count = 0;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || GetClientTeam(i) != 2)
+		if (!IsClientInGame(i) || GetClientTeam(i) != 2 || !IsPlayerAlive(i))
 			continue;
 
 		float f = GetFlowDistance(i);
-		if (f > maxf)
-			maxf = f;
+
+		if (!any || f < minf) minf = f;
+		if (!any || f > maxf) maxf = f;
+
+		any = true;
+		count++;
 	}
 
-	return maxf;
+	if (!any)
+	{
+		minf = 0.0;
+		maxf = 0.0;
+		return 0;
+	}
+
+	return count;
 }
 
-float GetSlowestFlow()
+void LogAliveSurvivorFlows()
 {
-	float minf = 0.0;
-	bool any = false;
-
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || GetClientTeam(i) != 2)
+		if (!IsClientInGame(i) || GetClientTeam(i) != 2 || !IsPlayerAlive(i))
 			continue;
 
-		float f = GetFlowDistance(i);
-		if (!any || f < minf)
-		{
-			minf = f;
-			any = true;
-		}
-	}
+		char name[64];
+		GetClientName(i, name, sizeof(name));
 
-	return any ? minf : 0.0;
+		float f = GetFlowDistance(i);
+		Dbg("AliveSurvivor client=%d name=%s flow=%.1f", i, name, f);
+	}
 }
 
 float GetFlowDistance(int client)
@@ -246,58 +276,104 @@ void CaptureOriginalDir()
 	g_bHaveOrigDir = false;
 	g_iOrigMobDir = -1;
 
-	if (g_hVSBuf == null)
-		return;
-
-	if (GetFeatureStatus(FeatureType_Native, "L4D2_ExecVScriptCode") != FeatureStatus_Available)
-		return;
-
-	// One string literal: SourcePawn doesn't auto-concatenate adjacent strings.
-	L4D2_ExecVScriptCode("try{ local v=-1; if(\"SessionOptions\" in getroottable() && ::SessionOptions!=null && (\"PreferredMobDirection\" in ::SessionOptions)) v=::SessionOptions.PreferredMobDirection; else if(\"DirectorOptions\" in getroottable() && ::DirectorOptions!=null && (\"PreferredMobDirection\" in ::DirectorOptions)) v=::DirectorOptions.PreferredMobDirection; Convars.SetValue(\"l4d2_vscript_return\",\"\"+v);}catch(e){ Convars.SetValue(\"l4d2_vscript_return\",\"-1\"); }");
-
-	char s[32];
-	g_hVSBuf.GetString(s, sizeof(s));
-
-	g_iOrigMobDir = StringToInt(s);
+	int dir = ReadPreferredMobDirection();
+	g_iOrigMobDir = dir;
 	g_bHaveOrigDir = true;
 
-	if (g_bDebug)
-		LogMessage("[FMD] Original PreferredMobDirection=%d", g_iOrigMobDir);
+	if (g_iDebug >= 1)
+		Dbg("Original PreferredMobDirection=%d", dir);
 }
 
 void ApplyFront()
 {
 	if (GetFeatureStatus(FeatureType_Native, "L4D2_ExecVScriptCode") != FeatureStatus_Available)
+	{
+		Dbg("ApplyFront: L4D2_ExecVScriptCode not available");
 		return;
+	}
 
-	L4D2_ExecVScriptCode("try{ if(\"SessionOptions\" in getroottable() && ::SessionOptions!=null) ::SessionOptions.PreferredMobDirection = SPAWN_IN_FRONT_OF_SURVIVORS; else if(\"DirectorOptions\" in getroottable() && ::DirectorOptions!=null) ::DirectorOptions.PreferredMobDirection = SPAWN_IN_FRONT_OF_SURVIVORS; }catch(e){}");
-
+	WritePreferredMobDirection(7);
 	g_bApplied = true;
 
-	if (g_bDebug)
-		LogMessage("[FMD] Applied front mob direction");
+	int after = ReadPreferredMobDirection();
+	Dbg("Applied front dir=7 readback=%d", after);
 }
 
 void RestoreOriginal()
 {
 	if (GetFeatureStatus(FeatureType_Native, "L4D2_ExecVScriptCode") != FeatureStatus_Available)
 	{
+		Dbg("RestoreOriginal: L4D2_ExecVScriptCode not available");
 		g_bApplied = false;
 		return;
 	}
 
 	int dir = (g_bHaveOrigDir ? g_iOrigMobDir : -1);
 
-	char code[256];
+	WritePreferredMobDirection(dir);
+	g_bApplied = false;
+
+	int after = ReadPreferredMobDirection();
+	Dbg("Restored dir=%d readback=%d", dir, after);
+}
+
+int ReadPreferredMobDirection()
+{
+	if (g_hVSBuf == null)
+		return -1;
+
+	if (GetFeatureStatus(FeatureType_Native, "L4D2_ExecVScriptCode") != FeatureStatus_Available)
+		return -1;
+
+	static const char code_dir[]  = "try{Convars.SetValue(\"l4d2_vscript_return\",\"\"+::DirectorOptions.PreferredMobDirection);}catch(e){Convars.SetValue(\"l4d2_vscript_return\",\"-999\");}";
+	static const char code_sess[] = "try{Convars.SetValue(\"l4d2_vscript_return\",\"\"+::SessionOptions.PreferredMobDirection);}catch(e){Convars.SetValue(\"l4d2_vscript_return\",\"-1\");}";
+
+	if (g_iDebug >= 2)
+		Dbg("VScript Read len_dir=%d", strlen(code_dir));
+
+	L4D2_ExecVScriptCode(code_dir);
+
+	char s[32];
+	g_hVSBuf.GetString(s, sizeof(s));
+	int v = StringToInt(s);
+
+	if (v == -999)
+	{
+		if (g_iDebug >= 2)
+			Dbg("VScript Read: DirectorOptions failed, trying SessionOptions (len=%d)", strlen(code_sess));
+
+		L4D2_ExecVScriptCode(code_sess);
+
+		g_hVSBuf.GetString(s, sizeof(s));
+		v = StringToInt(s);
+	}
+
+	return v;
+}
+
+void WritePreferredMobDirection(int dir)
+{
+	if (GetFeatureStatus(FeatureType_Native, "L4D2_ExecVScriptCode") != FeatureStatus_Available)
+		return;
+
+	char code[192];
 	Format(code, sizeof(code),
-		"try{ if(\"SessionOptions\" in getroottable() && ::SessionOptions!=null) ::SessionOptions.PreferredMobDirection = %d; else if(\"DirectorOptions\" in getroottable() && ::DirectorOptions!=null) ::DirectorOptions.PreferredMobDirection = %d; }catch(e){}",
+		"try{::DirectorOptions.PreferredMobDirection=%d;}catch(e){try{::SessionOptions.PreferredMobDirection=%d;}catch(e2){}}",
 		dir, dir
 	);
 
+	if (g_iDebug >= 2)
+		Dbg("VScript Write len=%d dir=%d", strlen(code), dir);
+
 	L4D2_ExecVScriptCode(code);
+}
 
-	g_bApplied = false;
+void Dbg(const char[] fmt, any ...)
+{
+	if (g_iDebug <= 0)
+		return;
 
-	if (g_bDebug)
-		LogMessage("[FMD] Restored mob direction=%d", dir);
+	char msg[512];
+	VFormat(msg, sizeof(msg), fmt, 2);
+	LogToFileEx(g_sLogPath, "%s", msg);
 }

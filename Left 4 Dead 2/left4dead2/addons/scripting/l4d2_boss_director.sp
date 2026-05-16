@@ -45,18 +45,17 @@ public Plugin myinfo =
     name = "[L4D2] Boss Director",
     author = "Tighty-Whitey",
     description = "Adaptive boss director.",
-    version = "1.1",
+    version = "1.2",
     url = ""
 };
 
-/* ===== ConVars ===== */
+// ConVars
 ConVar gC_Enable, gC_Modes, gC_DirectorNoBosses, gC_MPGameMode;
 ConVar gC_Tick, gC_Debug, gC_MaxAlive, gC_NoBosses;
 
 // Score
 ConVar gC_StartEasy, gC_StartNorm, gC_StartAdv, gC_StartExp, gC_ScoreMin;
 ConVar gC_ResetScoreOnCampaign;
-ConVar gC_VersusBaseline, gC_VersusForceReset;
 
 // Damage -> score
 ConVar gC_DmgMode, gC_DmgPerPt, gC_DmgMul;
@@ -107,7 +106,7 @@ ConVar gC_WanderPersistCsv;
 ConVar gC_WitchBlockMapsCsv;
 ConVar gC_TankBlockMapsCsv;
 
-/* ===== State ===== */
+// State
 
 bool g_bMapStarted = false;
 bool g_bEnabled = true;
@@ -175,7 +174,7 @@ int   g_WitchPlanCount = 0;
 float g_WitchPlanPct[K_MAX_WITCH_PLANS];
 bool  g_WitchPlanExecuted[K_MAX_WITCH_PLANS];
 bool  g_WitchPlanCanceled[K_MAX_WITCH_PLANS];
-int   g_WitchPlanType[K_MAX_WITCH_PLANS]; // 0 normal, 1 cluster, 2 wander
+int   g_WitchPlanType[K_MAX_WITCH_PLANS];
 int   g_WitchPlanSize[K_MAX_WITCH_PLANS];
 bool  g_bIsWanderModeLocked = false;
 static int g_iLastWitchPhase = 0;
@@ -188,7 +187,7 @@ float g_LockBaselineScore = 0.0;
 
 float g_VecZero[3] = {0.0, 0.0, 0.0};
 
-/* ===== Utils ===== */
+// Utils
 
 static bool BD_IsAllowedGameMode()
 {
@@ -205,7 +204,6 @@ static bool BD_IsAllowedGameMode()
     char mode[64];
     gC_MPGameMode.GetString(mode, sizeof mode);
 
-    // Wrap with commas to avoid partial matches.
     Format(mode, sizeof mode, ",%s,", mode);
     Format(list, sizeof list, ",%s,", list);
 
@@ -236,7 +234,7 @@ static void BD_ApplyDirectorNoBossesOnce()
 
     int v = gC_DirectorNoBosses.IntValue;
     if (v == 0)
-        return; // Do not touch director_no_bosses at all.
+        return;
 
     // Apply once per map.
     SetConVarInt(gC_NoBosses, 1);
@@ -257,7 +255,6 @@ static void BD_RefreshEnabled()
         return;
     }
 
-    // If enabling mid-map, apply the base director_no_bosses value once.
     BD_ApplyDirectorNoBossesOnce();
 }
 
@@ -351,7 +348,7 @@ static float GetFarthestFlowPct()
     return pct;
 }
 
-/* ===== Finale allowlist ===== */
+// Finale allowlist
 static void ParseFinaleAllowCSV()
 {
     g_FinalAllowCount = 0;
@@ -566,16 +563,7 @@ static void UpdateFinaleState()
         if (lower[i] == 'm' && lower[i+1] == '5') { g_IsFinale = true; return; }
 }
 
-/* ===== Score init ===== */
-
-static bool BDIsVersusMode()
-{
-    if (gC_MPGameMode == null) return false;
-    char mode[64];
-    gC_MPGameMode.GetString(mode, sizeof mode);
-    return (StrContains(mode, "versus", false) != -1) || (StrContains(mode, "scavenge", false) != -1);
-}
-
+// Score init
 static void InitOrPersistScoreForCampaign()
 {
     char mapname[64];
@@ -595,34 +583,26 @@ static void InitOrPersistScoreForCampaign()
     if (!campaign[0]) strcopy(campaign, sizeof campaign, mapname);
     bool firstLoad = (g_LastCampaign[0] == '\0');
     bool changed = !firstLoad && !StrEqual(campaign, g_LastCampaign);
-    bool doReset = (BDIsVersusMode() && gC_VersusForceReset.BoolValue) || firstLoad || (changed && gC_ResetScoreOnCampaign.BoolValue);
+    bool doReset = firstLoad || (changed && gC_ResetScoreOnCampaign.BoolValue);
 
 // Drop P5 lock on first load/campaign change only if enabled
-if ((BDIsVersusMode() && gC_VersusForceReset.BoolValue) || ((firstLoad || changed) && gC_P5UnlockOnCampaign.BoolValue))
+if ((firstLoad || changed) && gC_P5UnlockOnCampaign.BoolValue)
 {
     g_Phase5Lock = false;
     g_LastPhase = PHASE_1;
     g_LockBaselineScore = 0.0;
 }
 if (doReset)
-    {
-        float startScore = 0.0;
-        if (BDIsVersusMode())
-        {
-            startScore = gC_VersusBaseline.FloatValue;
-        }
-        else
-        {
-            char diff[32];
-            FindConVar("z_difficulty").GetString(diff, sizeof diff);
-            startScore = gC_StartExp.FloatValue;
-            if (StrEqual(diff, "Easy", false)) startScore = gC_StartEasy.FloatValue;
-            else if (StrEqual(diff, "Normal", false)) startScore = gC_StartNorm.FloatValue;
-            else if (StrEqual(diff, "Advanced", false)) startScore = gC_StartAdv.FloatValue;
-            else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false)) startScore = gC_StartExp.FloatValue;
-        }
-        g_Score = startScore;
-    }
+{
+    char diff[32];
+    FindConVar("z_difficulty").GetString(diff, sizeof diff);
+    float startScore = gC_StartExp.FloatValue;
+    if (StrEqual(diff, "Easy", false)) startScore = gC_StartEasy.FloatValue;
+    else if (StrEqual(diff, "Normal", false)) startScore = gC_StartNorm.FloatValue;
+    else if (StrEqual(diff, "Advanced", false)) startScore = gC_StartAdv.FloatValue;
+    else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false)) startScore = gC_StartExp.FloatValue;
+    g_Score = startScore;
+}
 strcopy(g_LastCampaign, sizeof g_LastCampaign, campaign);
 float floorS = gC_ScoreMin.FloatValue;
 if (g_Score < floorS) g_Score = floorS;
@@ -632,24 +612,18 @@ g_TokensConsumed = 0;
 }
 
 
-// HELPER FUNCTION
+// Helper function
 static void ResetCycleToPhase1()
 {
-    float startScore = 0.0;
-    if (BDIsVersusMode())
-    {
-        startScore = gC_VersusBaseline.FloatValue;
-    }
-    else
-    {
-        char diff[32];
-        FindConVar("z_difficulty").GetString(diff, sizeof diff);
-        float startScore = gC_StartExp.FloatValue;
-        if (StrEqual(diff, "Easy", false)) startScore = gC_StartEasy.FloatValue;
-        else if (StrEqual(diff, "Normal", false)) startScore = gC_StartNorm.FloatValue;
-        else if (StrEqual(diff, "Advanced", false)) startScore = gC_StartAdv.FloatValue;
-        else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false)) startScore = gC_StartExp.FloatValue;
-    }
+    char diff[32];
+    FindConVar("z_difficulty").GetString(diff, sizeof diff);
+    float startScore = gC_StartExp.FloatValue;
+    if      (StrEqual(diff, "Easy", false))      startScore = gC_StartEasy.FloatValue;
+    else if (StrEqual(diff, "Normal", false))    startScore = gC_StartNorm.FloatValue;
+    else if (StrEqual(diff, "Advanced", false))  startScore = gC_StartAdv.FloatValue;
+    else if (StrEqual(diff, "Expert", false) || StrEqual(diff, "Impossible", false))
+        startScore = gC_StartExp.FloatValue;
+
     g_Score = startScore;
     float floorS = gC_ScoreMin.FloatValue;
     if (g_Score < floorS) g_Score = floorS;
@@ -662,7 +636,7 @@ static void ResetCycleToPhase1()
     g_LastPhase = PHASE_1;
 }
 
-/* ===== Checkpoints ===== */
+// Checkpoints
 static void ResetCheckpointsState()
 {
     for (int i = 0; i < K_MAX_CHECKS; i++) g_QAwarded[i] = false;
@@ -786,7 +760,7 @@ static void AwardUpToPct(float curPct)
     if (any) g_QLastAwardedPct = GetLastAwardedPct();
 }
 
-/* ===== Damage -> Score ===== */
+// Damage -> Score
 public Action OnTakeDamageHook(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
     if (!g_bEnabled) return Plugin_Continue;
@@ -820,7 +794,7 @@ if (delta > 0.0)
     return Plugin_Continue;
 }
 
-/* ===== Moon Phase engine ===== */
+// Moon Phase engine
 static int GetAscendingPhaseFromScore(float s)
 {
     float p2 = gC_Ph2Score.FloatValue, p3 = gC_Ph3Score.FloatValue, p4 = gC_Ph4Score.FloatValue, p5 = gC_Ph5Score.FloatValue;
@@ -940,7 +914,7 @@ static int ResolveMoonPhase(float s)
     return phase;
 }
 
-/* ===== Witch placement and spawn ===== */
+// Witch placement and spawn
 static bool FindWitchSpawnPosBoss(float pos[3])
 {
     const int MAXC = 64;
@@ -999,7 +973,7 @@ static int SpawnOneWitchAt(const float pos[3])
     return ent;
 }
 
-/* ===== Witch planners ===== */
+// Witch planners
 static void ResetWitchPlans()
 {
     g_WitchPlanCount = 0;
@@ -1060,7 +1034,7 @@ static void ReconcileMoonPhaseWitchPlans(float curPct)
 
     int phase = ResolveMoonPhase(g_Score);
 
-    // === Phase 4/3 Wanderer Logic ===
+    // Phase 4/3 Wanderer Logic
     ConVar cvWander = FindConVar("witch_force_wander");
     if (cvWander != null)
     {
@@ -1101,7 +1075,7 @@ static void ReconcileMoonPhaseWitchPlans(float curPct)
         }
     }
     g_iLastWitchPhase = phase;
-    // === End Phase Logic ===
+    // End Phase Logic
 
     // GLOBAL BUDGET CHECK: if we've already met or exceeded the phase cap, cancel all pending plans
     int phaseCap = 0;
@@ -1292,7 +1266,7 @@ else if (phase == PHASE_5 || phase == PHASE_FROZEN5)
     }
 }
 
-/* ===== Execute witch plan ===== */
+// Execute witch plan
 static bool TryExecuteWitchPlan(int idx)
 {
     if (idx < 0 || idx >= g_WitchPlanCount) return false;
@@ -1576,7 +1550,7 @@ static bool TryExecuteWitchPlan(int idx)
     }
 }
 
-/* ===== Crumbs geometry (shared with Tanks behind) ===== */
+// Crumbs geometry (shared with Tanks behind)
 public bool TraceFilter_NoPlayers(int ent, int contentsMask, any data)
 {
     if (ent >= 1 && ent <= MaxClients) return false;
@@ -1702,12 +1676,12 @@ static bool FindBehindGroundPos(float outPos[3])
     return false;
 }
 
-/* ===== Tanks spawn helpers ===== */
+// Tanks spawn helpers
 static int SpawnTankAt(const float pos[3])
 {
     float ang[3] = {0.0, 0.0, 0.0};
     bool manageNoBosses = (gC_DirectorNoBosses != null && gC_DirectorNoBosses.BoolValue);
-bool savedNoBosses = false;
+    bool savedNoBosses = false;
     if (manageNoBosses && gC_NoBosses != null)
     {
         savedNoBosses = gC_NoBosses.BoolValue;
@@ -1767,7 +1741,7 @@ static bool SpawnOneAccordingToSide(int side)
     }
 }
 
-/* ===== Tanks plans ===== */
+// Tanks plans
 static void ResetPlans()
 {
     g_PlanCount = 0;
@@ -2035,7 +2009,7 @@ static bool TryExecutePlan(int idx)
     return false;
 }
 
-/* ===== HUD ===== */
+// HUD
 static bool IsAdminViewer(int client)
 {
     if (!IsValidClient(client)) return false;
@@ -2066,7 +2040,7 @@ if (g_Phase5Lock)
     else
         Format(lockStatus, sizeof lockStatus, "");
 
-    Format(msg, sizeof msg, "BossDirector v1.0\nScore: %.1f | Tanks %d/%d | Tokens rem %d used %d%s",
+    Format(msg, sizeof msg, "BossDirector v1.2\nScore: %.1f | Tanks %d/%d | Tokens rem %d used %d%s",
         g_Score, aliveTanks, cap, remTokens, g_TokensConsumed, lockStatus);
 }
 
@@ -2095,7 +2069,7 @@ Format(wmsg, sizeof wmsg, "Witches Phase %s | Killed %d | Spawned %d | Plans %d 
         if (IsAdminViewer(i)) PrintHintText(i, "%s", msg);
 }
 
-/* ===== Timers ===== */
+// Timers
 static void StartCrumbTimer()
 {
 	if (!g_bEnabled)
@@ -2156,11 +2130,25 @@ public Action T_ShowHudOnJoin(Handle t, any userid)
     return Plugin_Continue;
 }
 
-/* ===== Director tick ===== */
+// Director tick
 public Action T_Director(Handle h, any d)
 {
     if (!g_bEnabled) return Plugin_Continue;
-    if (!g_LeftStart) return Plugin_Continue;
+    if (!g_LeftStart)
+    {
+        if (L4D_HasAnySurvivorLeftSafeArea())
+        {
+            g_LeftStart = true;
+            float pct = GetFarthestFlowPct();
+            AwardUpToPct(pct);
+            ReconcilePlans(pct);
+            ReconcileMoonPhaseWitchPlans(pct);
+        }
+        else
+        {
+            return Plugin_Continue;
+        }
+    }
 
     float pct = GetFarthestFlowPct();
     AwardUpToPct(pct);
@@ -2168,24 +2156,24 @@ public Action T_Director(Handle h, any d)
     int current = RoundToFloor(g_Score / 100.0); if (current < 0) current = 0;
     g_TokensAwarded = current;
 
-if (IsCurrentMapName("c1m1_hotel"))
-{
-    int capTok = (gC_C1M1TokenCap != null) ? gC_C1M1TokenCap.IntValue : 0;
-    if (capTok > 0 && g_TokensAwarded > capTok) g_TokensAwarded = capTok;
-}
+    if (IsCurrentMapName("c1m1_hotel"))
+    {
+        int capTok = (gC_C1M1TokenCap != null) ? gC_C1M1TokenCap.IntValue : 0;
+        if (capTok > 0 && g_TokensAwarded > capTok) g_TokensAwarded = capTok;
+    }
 
     ReconcilePlans(pct);
 
-if (IsCurrentMapName("c1m1_hotel"))
-{
-    float reqPct = (gC_C1M1MinFlowPct != null) ? gC_C1M1MinFlowPct.FloatValue : 0.0;
-    if (reqPct > 0.0)
+    if (IsCurrentMapName("c1m1_hotel"))
     {
-        for (int i = 0; i < g_PlanCount; i++)
-            if (!g_PlanExecuted[i] && !g_PlanCanceled[i] && g_PlanPct[i] + 0.001 < reqPct)
-                g_PlanPct[i] = reqPct;
+        float reqPct = (gC_C1M1MinFlowPct != null) ? gC_C1M1MinFlowPct.FloatValue : 0.0;
+        if (reqPct > 0.0)
+        {
+            for (int i = 0; i < g_PlanCount; i++)
+                if (!g_PlanExecuted[i] && !g_PlanCanceled[i] && g_PlanPct[i] + 0.001 < reqPct)
+                    g_PlanPct[i] = reqPct;
+        }
     }
-}
 
     int phase = ResolveMoonPhase(g_Score);
     EnforceWanderCvarForPhase(phase);
@@ -2210,7 +2198,7 @@ if (IsCurrentMapName("c1m1_hotel"))
     return Plugin_Continue;
 }
 
-/* ===== Lifecycle ===== */
+// Lifecycle
 
 public void OnConfigsExecuted()
 {
@@ -2299,6 +2287,11 @@ public void E_RoundStart(Event e, const char[] name, bool dontBroadcast)
     PrintToServer("[BD] ROUND START: g_IsFinale=%d, finale_no_tanks=%d", g_IsFinale, gC_FinaleNoTanks.IntValue);
 
     g_LeftStart = false;
+    if (L4D_HasAnySurvivorLeftSafeArea())
+    {
+        g_LeftStart = true;
+    }
+
     g_WitchesKilledTotal = 0;
     g_WitchesSpawnedTotal = 0;
     g_bIsWanderModeLocked = false;
@@ -2357,7 +2350,13 @@ if (IsCurrentMapName("c1m1_hotel"))
 public void E_EnteredCheckpoint(Event e, const char[] name, bool dontBroadcast)
 {
     if (!g_bEnabled) return;
-    if (!g_LeftStart) return;
+    if (!g_LeftStart)
+    {
+        if (L4D_HasAnySurvivorLeftSafeArea())
+            g_LeftStart = true;
+        else
+            return;
+    }
     float pct = GetFarthestFlowPct();
     float minEnd = gC_EndAwardMinPct.FloatValue;
     if (pct >= minEnd) AwardUpToPct(100.0);
@@ -2370,7 +2369,7 @@ public void E_WitchKilled(Event e, const char[] name, bool dontBroadcast)
     DisplayHudToAdmins();
 }
 
-/* ===== OnPluginStart / CVARs / Admin cmds ===== */
+// OnPluginStart / CVARs / Admin cmds
 public void OnPluginStart()
 {
     AutoExecConfig(true, "l4d2_boss_director");
@@ -2388,8 +2387,6 @@ public void OnPluginStart()
     gC_StartNorm = CreateConVar(CVARNAME("_score_start_normal"), "100", "Starting score on Normal");
     gC_StartAdv = CreateConVar(CVARNAME("_score_start_advanced"), "150", "Starting score on Advanced");
     gC_StartExp = CreateConVar(CVARNAME("_score_start_expert"), "200", "Starting score on Expert");
-    gC_VersusBaseline = CreateConVar(CVARNAME("_versus_baseline_score"), "100", "Versus baseline starting score");
-    gC_VersusForceReset = CreateConVar(CVARNAME("_versus_force_baseline_reset"), "1", "In Versus, always reset score to versus baseline");
     gC_ScoreMin = CreateConVar(CVARNAME("_score_min"), "0", "Minimum score floor");
     gC_ResetScoreOnCampaign = CreateConVar(CVARNAME("_reset_score_on_campaign"), "1", "Reset score on campaign change");
 
@@ -2541,7 +2538,7 @@ public void OnTankBlockCsvChanged(ConVar cvar, const char[] oldv, const char[] n
     LogMessage("[BD] TankBlock CSV changed -> '%s'", newv);
 }
 
-/* ===== Admin Commands ===== */
+// Admin Commands
 static bool BD_CheckAccess(int client, const char[] overrideName)
 {
 	if (!CheckCommandAccess(client, overrideName, ADMFLAG_GENERIC))

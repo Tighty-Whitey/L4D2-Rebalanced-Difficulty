@@ -6,9 +6,8 @@
 #include <sdktools>
 #define CVARFLAGS FCVAR_NOTIFY
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.1"
 
-// Melee damage flag and blast flag.
 #if !defined DMG_CLUB
 #define DMG_CLUB (1 << 7)
 #endif
@@ -19,11 +18,7 @@
 ConVar g_hCvarAllow;
 
 ConVar g_hCvarModes;
-ConVar g_hCvarModesOff;
-ConVar g_hCvarModesTog;
 ConVar g_hCvarMPGameMode;
-
-int  g_iCurrentMode;
 bool g_bMapStarted;
 bool g_bLateLoad;
 bool g_bEnabled;
@@ -37,12 +32,10 @@ ConVar g_hCvarCharger;
 ConVar g_hCvarTank;
 ConVar g_hCvarWitch;
 
-// Momentum
 ConVar g_hCvarMomentumEnable;
 ConVar g_hCvarMomentumGap;
 ConVar g_hCvarMomentumBreakOnPin;
 
-// Vanilla adrenaline duration cvar.
 ConVar g_hCvarAdrDuration;
 
 bool  g_bCvarAllow;
@@ -60,20 +53,14 @@ bool  g_bMomentumEnabled;
 float g_fMomentumGap;
 bool  g_bMomentumBreakOnPin;
 
-// For each survivor: which infected (Tank / SI / Witch entity index) they are
-// protected from, and until what time.
 int   g_iProtFromInfected[MAXPLAYERS + 1];
 float g_fProtUntil     [MAXPLAYERS + 1];
 
-// Momentum (per survivor):
-// Track adrenaline use and optionally keep adrenaline active past the vanilla end time
-// while the survivor continues dealing damage within a grace window.
 bool  g_bMomentumTracking [MAXPLAYERS + 1];
 bool  g_bMomentumExtending[MAXPLAYERS + 1];
 float g_fLastDamageTime   [MAXPLAYERS + 1];
 float g_fAdrEndTime       [MAXPLAYERS + 1];
 
-// Global: is any survivor currently in momentum tracking?
 bool  g_bAnyMomentumTracking;
 
 public Plugin myinfo =
@@ -81,7 +68,7 @@ public Plugin myinfo =
 	name        = "[L4D2] Adrenaline Momentum",
 	author      = "Tighty-Whitey",
 	description = "Adrenaline melee staggers infected and grants brief protection; optional momentum extends adrenaline while player keeps dealing damage.",
-	version     = "1.0",
+	version     = "1.1",
 	url         = ""
 };
 
@@ -100,14 +87,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	// ConVars
 	g_hCvarAllow               = CreateConVar("l4d2_adrenaline_momentum_allow", "1", "Enable plugin (0/1).", CVARFLAGS);
 	g_hCvarModes               = CreateConVar("l4d2_adrenaline_momentum_modes", "", "Enable in these modes (comma list). Empty = all.", CVARFLAGS);
-	g_hCvarModesOff            = CreateConVar("l4d2_adrenaline_momentum_modes_off", "", "Disable in these modes (comma list).", CVARFLAGS);
-	g_hCvarModesTog            = CreateConVar("l4d2_adrenaline_momentum_modes_tog", "0",
-		"Mode mask: 0=all, 1=coop, 2=survival, 4=versus, 8=scavenge.", CVARFLAGS);
-
-	g_hCvarProtectTime         = CreateConVar("l4d2_adrenaline_momentum_protect", "0.5", "Protection window after stagger (seconds).", CVARFLAGS);
+	g_hCvarProtectTime         = CreateConVar("l4d2_adrenaline_momentum_protect", "1.0", "Protection window after stagger (seconds). (Tank's damage)", CVARFLAGS);
 
 	g_hCvarSmoker              = CreateConVar("l4d2_adrenaline_momentum_smoker", "1", "Stagger/block Smoker (0/1).", CVARFLAGS);
 	g_hCvarBoomer              = CreateConVar("l4d2_adrenaline_momentum_boomer", "1", "Stagger/block Boomer (0/1).", CVARFLAGS);
@@ -118,14 +100,9 @@ public void OnPluginStart()
 	g_hCvarTank                = CreateConVar("l4d2_adrenaline_momentum_tank", "1", "Stagger/block Tank (0/1).", CVARFLAGS);
 	g_hCvarWitch               = CreateConVar("l4d2_adrenaline_momentum_witch", "1", "Flinch/block Witch (0/1).", CVARFLAGS);
 
-	// Momentum
 	g_hCvarMomentumEnable      = CreateConVar("l4d2_adrenaline_momentum_momentum", "1", "Enable momentum extension (0/1).", CVARFLAGS);
 	g_hCvarMomentumGap         = CreateConVar("l4d2_adrenaline_momentum_gap", "15.0", "Max seconds between damage to keep momentum.", CVARFLAGS);
 	g_hCvarMomentumBreakOnPin  = CreateConVar("l4d2_adrenaline_momentum_break_on_pin", "1", "Pin cancels momentum extension (0/1).", CVARFLAGS);
-
-	CreateConVar("l4d2_adrenaline_momentum_version", PLUGIN_VERSION, "Plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-
-	// Underlying vanilla adrenaline duration cvar.
 	g_hCvarAdrDuration = FindConVar("adrenaline_duration");
 
 	AutoExecConfig(true, "l4d2_adrenaline_momentum");
@@ -133,15 +110,10 @@ public void OnPluginStart()
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
 	if ( g_hCvarMPGameMode != null ) g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Allow);
 
-	// Apply cvars.
 	GetCvars();
 
-	// Change hooks.
 	g_hCvarAllow.AddChangeHook(ConVarChanged_Allow);
 	g_hCvarModes.AddChangeHook(ConVarChanged_Allow);
-	g_hCvarModesOff.AddChangeHook(ConVarChanged_Allow);
-	g_hCvarModesTog.AddChangeHook(ConVarChanged_Allow);
-
 	g_hCvarProtectTime.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarSmoker.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarBoomer.AddChangeHook(ConVarChanged_Cvars);
@@ -155,11 +127,9 @@ public void OnPluginStart()
 	g_hCvarMomentumGap.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarMomentumBreakOnPin.AddChangeHook(ConVarChanged_Cvars);
 
-	// Late-load support: assume a map is already running.
 	if ( g_bLateLoad )
 	    g_bMapStarted = true;
 
-	// Reset state for clients already in-game.
 	for ( int i = 1; i <= MaxClients; i++ )
 	{
 	    ResetClientState(i);
@@ -205,14 +175,12 @@ void HookEvents(bool hook)
 	    HookEvent("witch_spawn", Event_WitchSpawn);
 	    HookEvent("adrenaline_used", Event_AdrenalineUsed);
 
-	    // Pin events: Hunter, Smoker, Jockey, Charger.
 	    HookEvent("lunge_pounce", Event_Pinned, EventHookMode_Post);
 	    HookEvent("tongue_grab", Event_Pinned, EventHookMode_Post);
 	    HookEvent("jockey_ride", Event_Pinned, EventHookMode_Post);
 	    HookEvent("charger_carry_start", Event_Pinned, EventHookMode_Post);
 	    HookEvent("charger_pummel_start", Event_Pinned, EventHookMode_Post);
 
-	    // Incap event.
 	    HookEvent("player_incapacitated", Event_PlayerIncapacitated, EventHookMode_Post);
 	}
 	else if ( hooked && !hook )
@@ -237,39 +205,6 @@ bool IsAllowedGameMode()
 	if ( g_hCvarMPGameMode == null )
 	    return false;
 
-	int iCvarModesTog = g_hCvarModesTog.IntValue;
-
-	if ( iCvarModesTog != 0 )
-	{
-	    if ( !g_bMapStarted )
-	        return false;
-
-	    g_iCurrentMode = 0;
-
-	    int entity = CreateEntityByName("info_gamemode");
-	    if ( IsValidEntity(entity) )
-	    {
-	        DispatchSpawn(entity);
-
-	        HookSingleEntityOutput(entity, "OnCoop", OnGamemode, true);
-	        HookSingleEntityOutput(entity, "OnSurvival", OnGamemode, true);
-	        HookSingleEntityOutput(entity, "OnVersus", OnGamemode, true);
-	        HookSingleEntityOutput(entity, "OnScavenge", OnGamemode, true);
-
-	        ActivateEntity(entity);
-	        AcceptEntityInput(entity, "PostSpawnActivate");
-
-	        if ( IsValidEntity(entity) )
-	            RemoveEdict(entity);
-	    }
-
-	    if ( g_iCurrentMode == 0 )
-	        return false;
-
-	    if ( !(iCvarModesTog & g_iCurrentMode) )
-	        return false;
-	}
-
 	char sGameModes[64], sGameMode[64];
 	g_hCvarMPGameMode.GetString(sGameMode, sizeof(sGameMode));
 	Format(sGameMode, sizeof(sGameMode), ",%s,", sGameMode);
@@ -282,23 +217,7 @@ bool IsAllowedGameMode()
 	        return false;
 	}
 
-	g_hCvarModesOff.GetString(sGameModes, sizeof(sGameModes));
-	if ( sGameModes[0] )
-	{
-	    Format(sGameModes, sizeof(sGameModes), ",%s,", sGameModes);
-	    if ( StrContains(sGameModes, sGameMode, false) != -1 )
-	        return false;
-	}
-
 	return true;
-}
-
-void OnGamemode(const char[] output, int caller, int activator, float delay)
-{
-	if ( strcmp(output, "OnCoop") == 0 ) g_iCurrentMode = 1;
-	else if ( strcmp(output, "OnSurvival") == 0 ) g_iCurrentMode = 2;
-	else if ( strcmp(output, "OnVersus") == 0 ) g_iCurrentMode = 4;
-	else if ( strcmp(output, "OnScavenge") == 0 ) g_iCurrentMode = 8;
 }
 
 void IsAllowed()
@@ -311,7 +230,6 @@ void IsAllowed()
 
 	    HookEvents(true);
 
-	    // Hook clients.
 	    for ( int i = 1; i <= MaxClients; i++ )
 	    {
 	        if ( IsClientInGame(i) )
@@ -320,7 +238,6 @@ void IsAllowed()
 	        }
 	    }
 
-	    // Hook witches if map already started.
 	    if ( g_bMapStarted )
 	        HookExistingWitches();
 	}
@@ -330,7 +247,6 @@ void IsAllowed()
 
 	    HookEvents(false);
 
-	    // Unhook clients.
 	    for ( int i = 1; i <= MaxClients; i++ )
 	    {
 	        if ( IsClientInGame(i) )
@@ -367,7 +283,6 @@ void ResetClientState(int client)
 	g_fAdrEndTime[client]        = -9999.0;
 }
 
-// Recompute global flag when tracking state changes.
 void RecomputeAnyMomentumTracking()
 {
 	g_bAnyMomentumTracking = false;
@@ -397,7 +312,6 @@ void HookExistingWitches()
 	}
 }
 
-// Hook commons when they are created so their damage can refresh momentum.
 public void OnEntityCreated(int entity, const char[] classname)
 {
 	if ( StrEqual(classname, "infected", false) )
@@ -406,7 +320,6 @@ public void OnEntityCreated(int entity, const char[] classname)
 	}
 }
 
-// Damage hook for common infected – only used to refresh momentum.
 public Action OnTakeDamageCommon(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
 	if ( !g_bEnabled || !g_bMomentumEnabled )
@@ -429,7 +342,6 @@ public void Event_WitchSpawn(Event event, const char[] name, bool dontBroadcast)
 	}
 }
 
-// When adrenaline is used, start tracking for potential momentum (but do not extend yet).
 public void Event_AdrenalineUsed(Event event, const char[] name, bool dontBroadcast)
 {
 	if ( !g_bEnabled || !g_bMomentumEnabled )
@@ -451,11 +363,9 @@ public void Event_AdrenalineUsed(Event event, const char[] name, bool dontBroadc
 
 	g_fAdrEndTime[client] = now + baseDur;
 
-	// At least one survivor is now tracked.
 	g_bAnyMomentumTracking = true;
 }
 
-// Pin handler: only break momentum if we are already in the extended phase.
 public void Event_Pinned(Event event, const char[] name, bool dontBroadcast)
 {
 	if ( !g_bEnabled || !g_bMomentumEnabled || !g_bMomentumBreakOnPin )
@@ -470,11 +380,9 @@ public void Event_Pinned(Event event, const char[] name, bool dontBroadcast)
 
 	float now = GetGameTime();
 
-	// Still inside vanilla adrenaline_duration: ignore pin for momentum.
 	if ( now <= g_fAdrEndTime[victim] )
 		return;
 
-	// We are past vanilla duration -> in potential/actual extended phase.
 	if ( g_bMomentumExtending[victim] )
 	{
 		SetEntProp(victim, Prop_Send, "m_bAdrenalineActive", 0); // cancel extended adrenaline.
@@ -488,8 +396,6 @@ public void Event_Pinned(Event event, const char[] name, bool dontBroadcast)
 	RecomputeAnyMomentumTracking();
 }
 
-// Incap handler: always clear momentum for this adrenaline use.
-// If we are in extended phase, also cancel extended adrenaline.
 public void Event_PlayerIncapacitated(Event event, const char[] name, bool dontBroadcast)
 {
 	if ( !g_bEnabled || !g_bMomentumEnabled )
@@ -545,7 +451,6 @@ void GetCvars()
 
 	g_bMomentumBreakOnPin = g_hCvarMomentumBreakOnPin.BoolValue;
 
-	// If momentum has been disabled via cvar, clear the global flag.
 	if ( !g_bMomentumEnabled )
 	{
 		g_bAnyMomentumTracking = false;
@@ -592,7 +497,6 @@ bool IsWitchEnt(int ent)
 	return StrEqual(classname, "witch", false);
 }
 
-// Returns false if this infected client type is disabled via cvars.
 bool IsClassAllowed(int client)
 {
 	int zclass = GetEntProp(client, Prop_Send, "m_zombieClass"); // 1=Smoker,...,8=Tank.
@@ -672,7 +576,6 @@ public Action Timer_RestoreState(Handle timer, any userid)
 	return Plugin_Stop;
 }
 
-// Momentum maintenance – run every frame.
 public void OnGameFrame()
 {
 	if ( !g_bEnabled || !g_bMomentumEnabled || !g_bAnyMomentumTracking )
@@ -692,7 +595,6 @@ public void OnGameFrame()
 			continue;
 		}
 
-		// Still within vanilla adrenaline duration – do nothing, let the game handle it.
 		if ( now <= g_fAdrEndTime[i] )
 			continue;
 
@@ -700,7 +602,6 @@ public void OnGameFrame()
 
 		if ( !g_bMomentumExtending[i] )
 		{
-			// Just passed natural end – decide if we start extending.
 			if ( gap <= g_fMomentumGap )
 			{
 				g_bMomentumExtending[i] = true;
@@ -708,7 +609,6 @@ public void OnGameFrame()
 			}
 			else
 			{
-				// Too big a gap before reaching end: no extension, stop tracking.
 				g_bMomentumTracking[i] = false;
 				RecomputeAnyMomentumTracking();
 			}
@@ -716,7 +616,6 @@ public void OnGameFrame()
 			continue;
 		}
 
-		// Already extending: keep or end based on gap.
 		if ( gap <= g_fMomentumGap )
 		{
 			SetEntProp(i, Prop_Send, "m_bAdrenalineActive", 1);
@@ -738,13 +637,11 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 
 	float now = GetGameTime();
 
-	// Momentum: any damage dealt to a client/witch by a tracked survivor refreshes timer.
 	if ( g_bMomentumEnabled && attacker >= 1 && attacker <= MaxClients && IsSurvivor(attacker) && g_bMomentumTracking[attacker] )
 	{
 		g_fLastDamageTime[attacker] = now;
 	}
 
-	// 1) Protection: survivor is currently protected from this infected.
 	if ( IsSurvivor(victim) )
 	{
 		int surv = victim;
@@ -761,7 +658,6 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 		}
 	}
 
-	// 2) Adrenaline (vanilla or extended) melee on infected => stagger + protection.
 	bool bInfectedClient = IsInfectedClient(victim);
 	bool bWitch          = IsWitchEnt(victim);
 
@@ -776,7 +672,6 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 
 	int surv2 = attacker;
 
-	// Treat either vanilla netprop or extended momentum as valid adrenaline state.
 	if ( !IsAdrenalineActiveNet(surv2) && !(g_bMomentumEnabled && g_bMomentumExtending[surv2]) )
 		return Plugin_Continue;
 

@@ -1,5 +1,5 @@
 // File: l4d2_horde_director.sp
-// Version: 1.0
+// Version: 1.1
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -27,11 +27,11 @@ public Plugin myinfo =
     name        = "[L4D2] Horde Director",
     author      = "Tighty-Whitey",
     description = "Horde director with timed triggers, flow-aware resume, trigger caps, and pace engine.",
-    version     = "1.0",
+    version     = "1.1",
     url         = ""
 };
 
-// --- Core state ---
+// Core state
 
 bool g_bIsSurvivorFighting;
 float g_fTimePast, g_fTimeCap;
@@ -81,6 +81,8 @@ ConVar cDbg;
 bool g_bDbg = false;
 
 char g_sDbgLog[PLATFORM_MAX_PATH];
+
+native bool L4D_HasAnySurvivorLeftSafeArea();
 
 void InitDebugLog()
 {
@@ -163,7 +165,7 @@ ConVar cPanicAmbSound; char g_sPanicAmbSound[96] = "Event.AmbientMob";
 // VScript buffer for L4D1/2 detection
 ConVar g_hVSBuf;
 
-// --- Backcap (slow-play clamp) CVARs/state ---
+// Backcap (slow-play clamp) CVARs/state
 
 // CVARs
 ConVar cBackcapEnable;
@@ -189,14 +191,14 @@ float g_fBackDelay = 3.0;
 // dwell of no progress before draining above target;
 
 // Derived/operational
-float g_fPaceSpeed = 0.0; // set in PaceUpdate()
-bool g_bSlowClamp = false; // clamp engaged
+float g_fPaceSpeed = 0.0;
+bool g_bSlowClamp = false; 
 float g_fSlowAccum = 0.0;
 float g_fFastAccum = 0.0;
 float g_fPaceCredit = 0.0;
-float g_fNoProgressAccum = 0.0; // dwell timer while above target before draining
+float g_fNoProgressAccum = 0.0; 
 
-// --- Helpers: parsing and clamps ---
+// Helpers: parsing and clamps
 
 static int ClampInt(int v, int lo, int hi){ if (v < lo) return lo;
 if (v > hi) return hi;
@@ -249,7 +251,7 @@ int ParseCountOrPercent(const char[] input, int base)
 	return n;
 }
 
-// --- Natives registration ---
+// Natives registration
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
@@ -267,7 +269,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	return APLRes_Success;
 }
 
-// --- Plugin start ---
+// Plugin start 
 
 public void OnPluginStart()
 {
@@ -413,7 +415,7 @@ public void OnPluginStart()
 	if (g_hVSBuf == null) g_hVSBuf = CreateConVar("l4d2_vscript_return", "", "VScript return buffer", FCVAR_DONTRECORD);
 }
 
-// --- Utility ---
+// Utility
 
 void SafeKillTimer(Handle &h)
 {
@@ -745,29 +747,56 @@ bool IsL4D1Campaign()
 	return false;
 }
 
-// --- Round lifecycle ---
+// Round lifecycle
 
 void E_RoundStart(Event e, const char[] n, bool b)
 {
-	g_iRoundStartMax = CountAliveSurvivors();
-	for (int i = 1; i <= MaxClients; i++) g_bFFDead[i] = false;
+    g_iRoundStartMax = CountAliveSurvivors();
+    for (int i = 1; i <= MaxClients; i++) g_bFFDead[i] = false;
 
-	g_fLastFlow = GetFurthestFlow();
-	g_fPaceBonus = 0.0;
-	g_fPaceWindowSum = 0.0;
-	g_iPaceWinCount = 0;
+    g_fLastFlow = GetFurthestFlow();
+    g_fPaceBonus = 0.0;
+    g_fPaceWindowSum = 0.0;
+    g_iPaceWinCount = 0;
 
-	g_iAutoCount = 0;
-	g_fAutoSum = 0.0;
-	g_fAutoStart = 0.0;
-	g_fPaceSoundNext = 0.0;
+    g_iAutoCount = 0;
+    g_fAutoSum = 0.0;
+    g_fAutoStart = 0.0;
+    g_fPaceSoundNext = 0.0;
 
-	// Backcap runtime state
-	g_bSlowClamp = false;
-	g_fSlowAccum = 0.0;
-	g_fFastAccum = 0.0;
-	g_fPaceCredit = 0.0;
-	g_fNoProgressAccum = 0.0;
+    g_bSlowClamp = false;
+    g_fSlowAccum = 0.0;
+    g_fFastAccum = 0.0;
+    g_fPaceCredit = 0.0;
+    g_fNoProgressAccum = 0.0;
+
+    if (L4D_HasAnySurvivorLeftSafeArea())
+    {
+        g_bIsSurvivorFighting = true;
+        g_fTimePast = 0.0;
+
+        int alive = CountAliveSurvivors();
+        if (g_iRoundStartMax < g_iSurvivorMax) g_iRoundStartMax = g_iSurvivorMax;
+        if (g_iRoundStartMax < alive) g_iRoundStartMax = alive;
+
+        g_fLastFlow = GetFurthestFlow();
+        g_fPaceBonus = 0.0;
+        g_fPaceWindowSum = 0.0;
+        g_iPaceWinCount = 0;
+
+        g_iAutoCount = 0;
+        g_fAutoSum = 0.0;
+        g_fAutoStart = GetEngineTime();
+        if (g_bTrigReset) g_iTrigCount = 0;
+
+        g_fPaceSoundNext = 0.0;
+
+        g_bSlowClamp = false;
+        g_fSlowAccum = 0.0;
+        g_fFastAccum = 0.0;
+        g_fPaceCredit = 0.0;
+        g_fNoProgressAccum = 0.0;
+    }
 }
 
 void E_LeftSafeArea(Event e, const char[] n, bool b)
@@ -822,7 +851,7 @@ void E_RoundEnd(Event e, const char[] n, bool b)
 	g_fNoProgressAccum = 0.0;
 }
 
-// --- Events ---
+// Events
 
 void E_PlayerDeath(Event e, const char[] n, bool b)
 {
@@ -855,7 +884,7 @@ void E_DefibUsed(Event e, const char[] n, bool b)
 	g_bFFDead[c] = false;
 }
 
-// --- Backcap update ---
+// Backcap update
 
 void BackcapUpdate()
 {
@@ -913,7 +942,7 @@ void BackcapUpdate()
 
 }
 
-// --- Tick ---
+// Tick
 static bool s_WasFrozen = false;
 static int s_UnfreezeGraceTicks = 0;
 static int s_FrozenTickCount = 0;
@@ -1028,8 +1057,8 @@ public Action T_Tick(Handle t)
 	}
 
 	// Pace enabled: compute bonus and apply backcap logic.
-	PaceUpdate();     // computes g_fPaceBonus and sets g_fPaceSpeed
-	BackcapUpdate();  // decides clamp state and manages credit
+	PaceUpdate();    
+	BackcapUpdate();
 
 	float add = 1.0 + g_fPaceBonus;
 
@@ -1088,7 +1117,7 @@ public Action T_Tick(Handle t)
 
 } // end of T_Tick()
 
-// --- Pace engine ---
+// Pace engine
 
 void PaceUpdate()
 {
@@ -1180,7 +1209,7 @@ void PaceUpdate()
 	}
 }
 
-// --- Survivor math and cap ---
+// Survivor math and cap
 void UpdateSurvivorCountsAndCap()
 {
 	int alive = CountAliveSurvivors();
@@ -1235,7 +1264,7 @@ bool ShouldLockToMaxScaling()
 	return frac >= g_fFFPercent;
 }
 
-// --- Flow helpers ---
+// Flow helpers
 float GetFurthestFlow()
 {
 	if (GetFeatureStatus(FeatureType_Native, "L4D2_GetFurthestSurvivorFlow") == FeatureStatus_Available)
@@ -1261,7 +1290,7 @@ float GetMapMaxFlow()
 	return 0.0;
 }
 
-/// --------------- Trigger pipeline ---------------
+// Trigger pipeline
 bool TryTrigger()
 {
 	if (!g_bAllow)
@@ -1432,7 +1461,7 @@ any NativeGetTriggerCount(Handle plugin, int numParams)
 	return g_iTrigCount;
 }
 
-// --- On-demand pace dump ---
+// Pace dump 
 public Action Cmd_PaceDump(int client, int args)
 {
 	float speed = (g_iPaceWinCount > 0) ? (g_fPaceWindowSum / float(g_iPaceWinCount)) : 0.0;
